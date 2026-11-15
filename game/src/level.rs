@@ -17,7 +17,7 @@ pub struct LevelPlugin;
 impl Plugin for LevelPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Levels>()
-            .insert_state(Level::_1)
+            .insert_state(Level::_0)
             .add_systems(OnEnter(Level::_0), spawn_level)
             .add_systems(OnEnter(Level::_1), spawn_level);
     }
@@ -50,7 +50,7 @@ fn spawn_level(
 }
 
 /// The `(row, col)` position of a Tile in the TileGrid.
-#[derive(Clone, Copy, Debug, Component)]
+#[derive(Clone, Copy, Debug, Component, Eq, PartialEq)]
 pub struct GridPos {
     pub row: i32,
     pub col: i32,
@@ -67,6 +67,11 @@ impl GridPos {
         return GridPos { row, col };
     }
 
+    /// Translate the original GridPos to a new coordinate.
+    pub fn translate(self, delta_row: i32, delta_col: i32) -> GridPos {
+        GridPos::new(self.row + delta_row, self.col + delta_col)
+    }
+
     /// Return `(x, y)` (world) coordinates of the cell's anchor
     /// (its bottom-left corner).
     pub fn to_xy(self) -> Vec2 {
@@ -78,8 +83,8 @@ impl GridPos {
 }
 
 /// A Tile.
-#[derive(Clone, Copy, Debug, Component)]
-enum Tile {
+#[derive(Clone, Copy, Debug, Component, Eq, PartialEq)]
+pub enum Tile {
     Floor,
     Wall,
     MazeStart,
@@ -116,7 +121,7 @@ impl fmt::Display for GridError {
 
 /// A 2D grid of tiles, representing the layout of the level.
 #[derive(Debug)]
-struct TileGrid {
+pub struct TileGrid {
     // row/col index of the grid's bounds:
     // bottom <= row <= top, left <= col <= right
     bottom: i32,
@@ -253,7 +258,7 @@ impl IndexMut<GridPos> for TileGrid {
 struct LevelRoot;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, States)]
-enum Level {
+pub enum Level {
     _0,
     _1,
 }
@@ -264,10 +269,10 @@ enum Level {
 
 /// All Level(s) used in-game.
 #[derive(Resource)]
-struct Levels(HashMap<Level, TileGrid>);
+pub struct Levels(HashMap<Level, TileGrid>);
 
 impl Levels {
-    fn get(&self, lvl: Level) -> &TileGrid {
+    pub fn get(&self, lvl: Level) -> &TileGrid {
         return &self.0[&lvl];
     }
 }
