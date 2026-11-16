@@ -16,6 +16,7 @@ use crate::level::GridPos;
 use crate::level::Level;
 use crate::level::Levels;
 use crate::level::Tile;
+use crate::level::TileGrid;
 use crate::spritesheet::SpriteSheet;
 use crate::spritesheet::SpriteSheets;
 
@@ -110,6 +111,57 @@ fn handle_player_input(
     return;
 }
 
+fn resolve_move(
+    pos: GridPos,
+    cmd: &InputCommand,
+    grid: &TileGrid,
+) -> Option<(GridPos, Facing)> {
+    let row_delta= cmd.delta.x; // TODO: fix this?
+    let col_delta= cmd.delta.y;
+    if row_delta == 0 && col_delta == 0 {
+        return None;
+    }
+
+   let vert = if row_delta != 0 {
+        let facing = if row_delta < 0 { Facing::Down } else { Facing::Up };
+        Some((pos.translate(row_delta, 0), facing))
+    } else {
+        None
+    };
+   let horiz = if col_delta != 0 {
+        let facing = if col_delta < 0 { Facing::Left } else { Facing::Right };
+        Some((pos.translate(0, col_delta), facing))
+    } else {
+        None
+    };
+
+    { // allow diag
+        if let (Some((row, row_facing)), Some((col, col_facing))) = (vert, horiz) {
+            let diag = pos.translate(row_delta, col_delta);
+            let row_walkable = grid[row] != Tile::Wall;
+            let col_walkable = grid[row] != Tile::Wall;
+            let diag_walkable = grid[diag] != Tile::Wall;
+
+            if diag_walkable && (row_walkable || col_walkable) {
+                let facing = match cmd.recent {
+                    Some(facing) => facing,
+                    None => Facing::Down,
+                };
+                // let facing = cmd.recent.filter(|f| *f == col_facing || *f == row_facing).unwrap_or(hf);
+                return Some((diag, facing));
+            }
+        }
+    }
+
+    let recent_is_vert = matches!(cmd.recent, Some(Facing::Up | Facing::Down));
+    let order = if recent_is_vert {
+        [vert, horiz]
+    } else {
+        [horiz, vert]
+    };
+    order.into_iter().flatten().find(|(pos, _)| grid[*pos] != Tile::Wall)
+}
+
 fn simulate(
     mut tick: ResMut<SimTick>,
     current_level: Res<State<Level>>,
@@ -120,10 +172,24 @@ fn simulate(
         return;
     };
 
+    info!("sim: cmd={}", cmd);
+
     sim_state.prev_pos = sim_state.pos;
     sim_state.prev_facing = sim_state.facing;
 
-    info!("sim: cmd={}", cmd);
+    let lvl = *current_level.get();
+    let grid = levels.get(lvl);
+    match resolve_move(sim_state.pos, cmd, grid) {
+        Some((pos, facing)) => {
+            sim_state.pos = pos;
+            sim_state.facing = facing;
+        },
+        None => {
+            if let Some(facing) = cmd.recent {
+                sim_state.facing = facing;
+            };
+        },
+    }
 
     tick.0 = tick.0 + 1;
 
@@ -143,8 +209,6 @@ fn simulate(
     //     Some(intent) => {
     //         info!("saw({})", intent);
 
-    //         let lvl = *current_level.get();
-    //         let grid = levels.get(lvl);
 
     //         let is_walkable = grid[intent.pos] != Tile::Wall;
     //         if is_walkable {
