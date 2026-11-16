@@ -17,9 +17,10 @@ pub struct LevelPlugin;
 impl Plugin for LevelPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Levels>()
-            .insert_state(Level::_0)
+            .insert_state(Level::_2)
             .add_systems(OnEnter(Level::_0), spawn_level)
-            .add_systems(OnEnter(Level::_1), spawn_level);
+            .add_systems(OnEnter(Level::_1), spawn_level)
+            .add_systems(OnEnter(Level::_2), spawn_level);
     }
 }
 
@@ -205,6 +206,7 @@ impl TileGrid {
         match lvl {
             Level::_0 => Self::lvl_0(),
             Level::_1 => Self::lvl_1(),
+            Level::_2 => Self::lvl_2(),
         }
     }
 
@@ -230,6 +232,37 @@ impl TileGrid {
         }
         grid[GridPos::new(0, -4)] = Tile::MazeStart;
         grid[GridPos::new(0, 4)] = Tile::MazeEnd;
+
+        return grid;
+    }
+
+    fn lvl_2() -> Self {
+        let mut grid = TileGrid::new(-5, -9, 5, 9).unwrap();
+        let bottom = grid.bottom;
+        let top = grid.top;
+        let left = grid.left;
+        let right = grid.right;
+        for c in grid.left..=grid.right {
+            grid[GridPos::new(bottom, c)] = Tile::Wall;
+            grid[GridPos::new(top, c)] = Tile::Wall;
+        }
+        for r in grid.bottom..=grid.top {
+            grid[GridPos::new(r, left)] = Tile::Wall;
+            grid[GridPos::new(r, right)] = Tile::Wall;
+        }
+        grid[GridPos::new(-4, -8)] = Tile::MazeStart;
+        grid[GridPos::new(4, 8)] = Tile::MazeEnd;
+
+        grid[GridPos::new(-2, -2)] = Tile::Wall;
+        grid[GridPos::new(-2, 1)] = Tile::Wall;
+        grid[GridPos::new(-1, 1)] = Tile::Wall;
+        grid[GridPos::new(0, 1)] = Tile::Wall;
+        grid[GridPos::new(1, 1)] = Tile::Wall;
+        grid[GridPos::new(2, 1)] = Tile::Wall;
+        grid[GridPos::new(0, 2)] = Tile::Wall;
+        grid[GridPos::new(0, 3)] = Tile::Wall;
+        grid[GridPos::new(1, 4)] = Tile::Wall;
+        grid[GridPos::new(2, 4)] = Tile::Wall;
 
         return grid;
     }
@@ -261,6 +294,13 @@ struct LevelRoot;
 pub enum Level {
     _0,
     _1,
+    _2,
+}
+
+impl Level {
+    const ALL: [Level; 3] = [
+        Level::_0, Level::_1, Level::_2,
+    ];
 }
 
 // fn on_maze_end_reached(mut next: ResMut<NextState<Level>>) {
@@ -280,8 +320,7 @@ impl Levels {
 impl FromWorld for Levels {
     fn from_world(_: &mut World) -> Self {
         let mut levels = HashMap::new();
-        let to_init = vec![Level::_0, Level::_1];
-        for lvl in to_init {
+        for lvl in Level::ALL {
             levels.insert(lvl, TileGrid::for_level(lvl));
         }
 

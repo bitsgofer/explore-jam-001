@@ -335,7 +335,7 @@ pub enum Facing {
 }
 
 impl Facing {
-    const all: [Facing; 4] = [Facing::Down, Facing::Left, Facing::Up, Facing::Right];
+    const ALL: [Facing; 4] = [Facing::Down, Facing::Left, Facing::Up, Facing::Right];
 
     fn delta(&self) -> IVec2 {
         match self {
@@ -578,7 +578,7 @@ fn collect_input(
         return;
     };
 
-    for dir in Facing::all {
+    for dir in Facing::ALL {
         if input.just_pressed(dir.key_code()) {
             intent.record(dir);
         }
