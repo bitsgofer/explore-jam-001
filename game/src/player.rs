@@ -21,13 +21,12 @@ use crate::spritesheet::SpriteSheets;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_player)
-            .add_systems(Update, (handle_player_input, animate_player).chain())
-            // TODO(): the frequency of FixedUpdate is probably related to
-            // the input's cooldownTimer somehow.
+            // .add_systems(Update, handle_player_input)
+            .add_systems(Update, animate_player)
             .insert_resource(Time::<Fixed>::from_seconds(
                 global::SIMULATION_INTERVAL_SECONDS,
-            ))
-            .add_systems(FixedUpdate, simulate);
+            ));
+        // .add_systems(FixedUpdate, simulate);
     }
 }
 
@@ -36,14 +35,15 @@ fn spawn_player(mut commands: Commands, sheets: Res<SpriteSheets>) {
     let pos = GridPos::new(0, 0);
     let animation_index: usize = 0;
     commands.spawn((
+        Player,
         pos,
         sheet.sprite(animation_index),
         Transform::from_translation(pos.to_xy().extend(global::PLAYER_Z)),
         Anchor::BOTTOM_LEFT,
-        Player,
         SimulationState {
             pos: pos,
             prev_pos: pos,
+            // prev_pos: GridPos::new(-1, 0), // debug
             facing: Facing::Down,
             prev_facing: Facing::Down,
         },
@@ -52,8 +52,10 @@ fn spawn_player(mut commands: Commands, sheets: Res<SpriteSheets>) {
             tapped: None,
         },
         AnimationState {
-            moving: true,
-            index: animation_index,
+            // will get modified in animate_player()
+            moving: false,
+            facing: Facing::Down,
+            index: 15 as usize,
             timer: Timer::from_seconds(
                 global::PLAYER_ANIMATION_FRAME_DURATION_SECONDS,
                 TimerMode::Repeating,
@@ -185,48 +187,52 @@ fn animate_player(
         return;
     };
 
-    if sim_state.pos == sim_state.prev_pos {
-        animation.moving = false;
-    } else {
-        animation.moving = true;
-    }
-
     // animate position
-    let frac = fixed_time.overstep_fraction();
-    let xy = sim_state.prev_pos.to_xy().lerp(sim_state.pos.to_xy(), frac);
-    transform.translation.x = xy.x;
-    transform.translation.y = xy.y;
-    info!("animate: transform.set(x={}, y={})", xy.x, xy.y);
-
-    // animate sprite
-    let atlas = match sprite.texture_atlas.as_mut() {
-        Some(a) => a,
-        None => return,
-    };
-
-    let current_row = animation.index / global::MAX_FRAMES_PER_ANIMATION;
-    let current_col = animation.index % global::MAX_FRAMES_PER_ANIMATION;
-    let new_row = sim_state.facing.row_index_in_player_spritesheet();
-    if sim_state.facing != sim_state.prev_facing {
-        animation.index = new_row * global::MAX_FRAMES_PER_ANIMATION;
-        animation.timer.reset();
-        info!("animate: facing changed => set atlas.index={}", new_row);
-    } else {
-        if animation.moving {
-            animation.timer.tick(time.delta());
-            info!("animate: still moving");
-            if animation.timer.just_finished() {
-                let target_col = (current_col + 1) % global::MAX_FRAMES_PER_ANIMATION;
-                animation.index = current_row * global::MAX_FRAMES_PER_ANIMATION + target_col;
-                info!("animate: moving past timer => set atlas.index={}", animation.index);
-            }
-        } else {
-            animation.index = new_row * global::MAX_FRAMES_PER_ANIMATION;
-            info!("animate: not moving => set atlas.index={}", animation.index);
-
-        }
+    {
+        let frac = fixed_time.overstep_fraction();
+        let xy = sim_state
+            .prev_pos
+            .to_xy()
+            .lerp(sim_state.pos.to_xy(), frac)
+            .round();
+        transform.translation.x = xy.x;
+        transform.translation.y = xy.y;
+        info!("animate: transform.set(x={}, y={})", xy.x, xy.y);
     }
-    atlas.index = animation.index;
+
+    // animate the sprite
+    // CONTROL: dependent on simulate() advancing the .facing/.pos
+    {
+        let desired_facing: Facing = sim_state.facing;
+        let desired_moving: bool = sim_state.pos != sim_state.prev_pos;
+        // info!("animate: desired_facing={}, desired_moving={}; anim.facing={}, anim.moving={}", desired_facing, desired_moving, animation.facing, animation.moving);
+
+        let animation_col = animation.index % global::MAX_FRAMES_PER_ANIMATION;
+        if desired_moving != animation.moving || desired_facing != animation.facing {
+            animation.moving = desired_moving;
+            animation.facing = desired_facing;
+            animation.index = animation.facing.row_index_in_player_spritesheet()
+                * global::MAX_FRAMES_PER_ANIMATION;
+            animation.timer.reset();
+            // info!("animate: reset; facing={}, moving={}, index={}", animation.facing, animation.moving, animation.index);
+        } else if desired_moving {
+            animation.timer.tick(time.delta());
+            animation.index = animation.facing.row_index_in_player_spritesheet()
+                * global::MAX_FRAMES_PER_ANIMATION
+                + (animation_col + animation.timer.times_finished_this_tick() as usize)
+                    % global::MAX_FRAMES_PER_ANIMATION;
+            // info!("animate: continue; facing={}, moving={}, index={}", animation.facing, animation.moving, animation.index);
+        }
+
+        let atlas = match sprite.texture_atlas.as_mut() {
+            Some(a) => a,
+            None => return,
+        };
+        atlas.index = animation.index;
+        // info!("animate: atlas.index={}", animation.index);
+    }
+
+    return;
 }
 
 #[derive(Component)]
@@ -313,6 +319,7 @@ struct Buffer {
 #[derive(Component)]
 struct AnimationState {
     moving: bool,
+    facing: Facing,
     index: usize,
     timer: Timer,
 }
