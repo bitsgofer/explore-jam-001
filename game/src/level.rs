@@ -50,7 +50,7 @@ fn spawn_level(
 }
 
 /// The `(row, col)` position of a Tile in the TileGrid.
-#[derive(Clone, Copy, Debug, Component)]
+#[derive(Clone, Copy, Debug, Component, Eq, PartialEq)]
 pub struct GridPos {
     pub row: i32,
     pub col: i32,
