@@ -2,9 +2,11 @@ use std::fmt;
 
 use bevy::log::info;
 use bevy::prelude::{
-    App, Commands, Component, Fixed, Name, Plugin, Query, Res, Sprite, Startup, Time, Timer,
-    TimerMode, Transform, Update, With,
+    App, ButtonInput, Commands, Component, Fixed, IntoScheduleConfigs, KeyCode, Name, Plugin,
+    Query, Res, RunFixedMainLoop, RunFixedMainLoopSystems, Sprite, Startup, Time, Timer, TimerMode,
+    Transform, Update, With,
 };
+
 use bevy::sprite::Anchor;
 
 use crate::global;
@@ -16,6 +18,13 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_player)
+            .insert_resource(Time::<Fixed>::from_seconds(
+                global::SIMULATION_INTERVAL_SECONDS,
+            ))
+            .add_systems(
+                RunFixedMainLoop,
+                collect_input.in_set(RunFixedMainLoopSystems::BeforeFixedMainLoop),
+            ) // per render frame, but before FixedUpdate (sim) // !IMPORTANT
             .add_systems(Update, animate_player); // per render frame
         return;
     }
@@ -31,6 +40,7 @@ fn spawn_player(mut commands: Commands, sheets: Res<SpriteSheets>) {
         Transform::from_translation(init_pos.to_xy().extend(global::PLAYER_Z)),
         Anchor::BOTTOM_LEFT,
         Name::new(format!("Player")),
+        InputBuffer::default(),
         SimulationState::default(),
         // SimulationState { // debug
         //     prev_pos: GridPos::new(1, 0),
@@ -40,6 +50,31 @@ fn spawn_player(mut commands: Commands, sheets: Res<SpriteSheets>) {
         // },
         AnimationState::default_with_anim_duration(global::PLAYER_ANIMATION_FRAME_DURATION_SECONDS),
     ));
+}
+
+/// Every render frame, look at what key(s) player pressed & when (render frame
+/// sequence number) => store into InputBuffer.
+///
+/// If the same key is already pressed, then last write wins (only change the
+/// sequence number). This happens when press + release + press very quickly.
+///
+/// This allow the sim to see all keys pressed since it last run.
+/// => handle player's intent/input more accurately.
+///
+/// !IMPORTANT: The sim will also clear the buffer after reading.
+fn collect_input(
+    input: Res<ButtonInput<KeyCode>>,
+    mut query: Query<&mut InputBuffer, With<Player>>,
+) {
+    let Ok(mut buffer) = query.single_mut() else {
+        return;
+    };
+
+    for key in Facing::ALL.map(Facing::key_codes).concat() {
+        if input.just_pressed(key) {
+            buffer.record(key);
+        }
+    }
 }
 
 fn animate_player(
@@ -129,12 +164,24 @@ enum Facing {
 }
 
 impl Facing {
+    const ALL: [Facing; 4] = [Facing::Down, Facing::Left, Facing::Up, Facing::Right];
+
     fn row_index_in_player_spritesheet(&self) -> usize {
         match self {
             Facing::Down => 0,
             Facing::Left => 1,
             Facing::Up => 2,
             Facing::Right => 3,
+        }
+    }
+
+    fn key_codes(self) -> &'static [KeyCode] {
+        // support both Arrow(s), WASD and HJKL (vim)
+        match self {
+            Facing::Down => &[KeyCode::ArrowDown, KeyCode::KeyS, KeyCode::KeyJ],
+            Facing::Left => &[KeyCode::ArrowLeft, KeyCode::KeyA, KeyCode::KeyH],
+            Facing::Up => &[KeyCode::ArrowUp, KeyCode::KeyW, KeyCode::KeyK],
+            Facing::Right => &[KeyCode::ArrowRight, KeyCode::KeyD, KeyCode::KeyL],
         }
     }
 }
@@ -147,6 +194,72 @@ impl fmt::Display for Facing {
             Facing::Up => write!(f, "Up"),
             Facing::Right => write!(f, "Right"),
         }
+    }
+}
+
+#[derive(Debug, Default)]
+struct RenderFrameNo(u32); // monotonic counter
+
+impl fmt::Display for RenderFrameNo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+#[derive(Component, Debug, Default)]
+struct InputBuffer {
+    seq_no: RenderFrameNo,
+    pressed_down: bool,
+    pressed_down_at: RenderFrameNo,
+    pressed_left: bool,
+    pressed_left_at: RenderFrameNo,
+    pressed_up: bool,
+    pressed_up_at: RenderFrameNo,
+    pressed_right: bool,
+    pressed_right_at: RenderFrameNo,
+}
+
+impl fmt::Display for InputBuffer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "InputBuffer{{seq_no:{}, down:({}, {}), left:({}, {}), up:({}, {}), right:({}, {}),}}",
+            self.seq_no,
+            self.pressed_down,
+            self.pressed_down_at,
+            self.pressed_left,
+            self.pressed_left_at,
+            self.pressed_up,
+            self.pressed_up_at,
+            self.pressed_right,
+            self.pressed_right_at
+        )
+    }
+}
+
+impl InputBuffer {
+    fn record(&mut self, key: KeyCode) {
+        self.seq_no.0 += 1;
+        match key {
+            KeyCode::ArrowDown | KeyCode::KeyS | KeyCode::KeyJ => {
+                self.pressed_down = true;
+                self.pressed_down_at = RenderFrameNo(self.seq_no.0);
+            }
+            KeyCode::ArrowLeft | KeyCode::KeyA | KeyCode::KeyH => {
+                self.pressed_left = true;
+                self.pressed_left_at = RenderFrameNo(self.seq_no.0);
+            }
+            KeyCode::ArrowUp | KeyCode::KeyW | KeyCode::KeyK => {
+                self.pressed_up = true;
+                self.pressed_up_at = RenderFrameNo(self.seq_no.0);
+            }
+            KeyCode::ArrowRight | KeyCode::KeyD | KeyCode::KeyL => {
+                self.pressed_right = true;
+                self.pressed_right_at = RenderFrameNo(self.seq_no.0);
+            }
+            _ => {}
+        }
+        // info!("record: {}", self);
     }
 }
 
