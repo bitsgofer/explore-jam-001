@@ -253,7 +253,7 @@ impl IndexMut<GridPos> for TileGrid {
 struct LevelRoot;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, States)]
-enum Level {
+pub enum Level {
     _0,
     _1,
 }
@@ -264,7 +264,7 @@ enum Level {
 
 /// All Level(s) used in-game.
 #[derive(Resource)]
-struct Levels(HashMap<Level, TileGrid>);
+pub struct Levels(HashMap<Level, TileGrid>);
 
 impl Levels {
     fn get(&self, lvl: Level) -> &TileGrid {

@@ -2,15 +2,15 @@ use std::fmt;
 
 use bevy::log::info;
 use bevy::prelude::{
-    App, ButtonInput, Commands, Component, Fixed, IntoScheduleConfigs, KeyCode, Name, Plugin,
-    Query, Res, RunFixedMainLoop, RunFixedMainLoopSystems, Sprite, Startup, Time, Timer, TimerMode,
-    Transform, Update, With,
+    App, ButtonInput, Commands, Component, Fixed, FixedUpdate, IVec2, IntoScheduleConfigs, KeyCode,
+    Name, Plugin, Query, Res, ResMut, Resource, RunFixedMainLoop, RunFixedMainLoopSystems, Sprite,
+    Startup, State, Time, Timer, TimerMode, Transform, Update, With,
 };
 
 use bevy::sprite::Anchor;
 
 use crate::global;
-use crate::level::GridPos;
+use crate::level::{GridPos, Level, Levels};
 use crate::spritesheet::{SpriteSheet, SpriteSheets};
 
 pub struct PlayerPlugin;
@@ -18,6 +18,7 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_player)
+            .insert_resource(SimStepNo::new(1))
             .insert_resource(Time::<Fixed>::from_seconds(
                 global::SIMULATION_INTERVAL_SECONDS,
             ))
@@ -25,6 +26,7 @@ impl Plugin for PlayerPlugin {
                 RunFixedMainLoop,
                 collect_input.in_set(RunFixedMainLoopSystems::BeforeFixedMainLoop),
             ) // per render frame, but before FixedUpdate (sim) // !IMPORTANT
+            .add_systems(FixedUpdate, (compute_sim_changes, simulate).chain()) // per sim step
             .add_systems(Update, animate_player); // per render frame
         return;
     }
@@ -41,6 +43,7 @@ fn spawn_player(mut commands: Commands, sheets: Res<SpriteSheets>) {
         Anchor::BOTTOM_LEFT,
         Name::new(format!("Player")),
         InputBuffer::default(),
+        InputCommand::default(),
         SimulationState::default(),
         // SimulationState { // debug
         //     prev_pos: GridPos::new(1, 0),
@@ -75,6 +78,131 @@ fn collect_input(
             buffer.record(key);
         }
     }
+}
+
+/// Calculate the player's input towards the simulation.
+///
+/// In a client-server setup, this will be the client code.
+fn compute_sim_changes(
+    sim_step: Res<SimStepNo>,
+    input: Res<ButtonInput<KeyCode>>,
+    mut query: Query<(&mut InputBuffer, &mut InputCommand), With<Player>>,
+) {
+    let Ok((mut input_buffer, mut cmd)) = query.single_mut() else {
+        return;
+    };
+
+    let (delta, facing) = player_intent(&input_buffer, input);
+    // info!("compute_sim_changes: delta={}, facing={:?}", delta, facing);
+
+    input_buffer.clear();
+
+    let command = InputCommand{
+        sim_step: *sim_step,
+        delta: IVec2::new(delta.y, delta.x), // TODO: switch to delta type, instead of reversing to get (dr, dc)
+        facing,
+    };
+    *cmd = command;
+    // info!("compute_sim_changes: send cmd={}", *cmd);
+}
+
+/// Called every RenderFrame that runs together (and before) a SimStep,
+/// this fn computes the next delta(row, col) && Facing direction,
+/// which we will need for the next simulation step.
+///
+/// It use the buffered input (since the last SimStep) + the current input
+/// seen this RenderFrame for this calculation.
+fn player_intent(buffer: &InputBuffer, input: Res<ButtonInput<KeyCode>>) -> (IVec2, Option<Facing>) {
+    // keys pressed in this RenderFrame
+    let pressed_down = if input.pressed(KeyCode::ArrowDown) || input.pressed(KeyCode::KeyS) || input.pressed(KeyCode::KeyJ) { true } else { false };
+    let pressed_left = if input.pressed(KeyCode::ArrowLeft) || input.pressed(KeyCode::KeyA) || input.pressed(KeyCode::KeyH) { true } else { false };
+    let pressed_up = if input.pressed(KeyCode::ArrowUp) || input.pressed(KeyCode::KeyW) || input.pressed(KeyCode::KeyK) { true } else { false };
+    let pressed_right = if input.pressed(KeyCode::ArrowRight) || input.pressed(KeyCode::KeyD) || input.pressed(KeyCode::KeyL) { true } else { false };
+
+    // combine pressed_DIRECTION (in this RenderFrame) with the input
+    // bufered since the last SimStep (it was not yet handled)
+    // => direction that the player intended to move
+    let down = pressed_down || buffer.pressed_down;
+    let left = pressed_left || buffer.pressed_left;
+    let up = pressed_up || buffer.pressed_up;
+    let right = pressed_right || buffer.pressed_right;
+
+    // translate keys pressed -> delta in row && col, i.e (-1, 0, +1)
+    //
+    // we also handle SOCD (Simultaneous Opposing Cardinal Directions),
+    // picking only one direction between lef/right or up/down (the latest)
+    let delta_row: Option<(i32, Facing, RenderFrameNo)> = if down && up {
+        if buffer.pressed_down_at.0 > buffer.pressed_up_at.0 {
+            Some((-1, Facing::Down, buffer.pressed_down_at))
+        } else {
+            Some((1, Facing::Up, buffer.pressed_up_at))
+        }
+    } else if down {
+        Some((-1, Facing::Down, buffer.pressed_down_at))
+    } else if up {
+        Some((1, Facing::Up, buffer.pressed_up_at))
+    } else {
+        None
+    };
+    let delta_col: Option<(i32, Facing, RenderFrameNo)> = if left && right {
+        if buffer.pressed_left_at.0 > buffer.pressed_right_at.0 {
+            Some((-1, Facing::Left, buffer.pressed_left_at))
+        } else {
+            Some((1, Facing::Right, buffer.pressed_right_at))
+        }
+    } else if left {
+        Some((-1, Facing::Left, buffer.pressed_left_at))
+    } else if right {
+        Some((1, Facing::Right, buffer.pressed_right_at))
+    } else {
+        None
+    };
+
+    // aggregate into delta(row, col)
+    // and translate the latest direction key pressed -> Facing direction
+    match (delta_row, delta_col) {
+        (Some((dr, r_facing, r_pressed_at)), Some((dc, c_facing, c_pressed_at))) => {
+            let facing = if r_pressed_at.0 > c_pressed_at.0 {
+                r_facing
+            } else {
+                c_facing
+            };
+
+            (IVec2::new(dr, dc), Some(facing))
+        }
+        (Some((dr, r_facing, r_pressed_at)), None) => {
+            (IVec2::new(dr, 0), Some(r_facing))
+        }
+        (None, Some((dc, c_facing, c_pressed_at))) => {
+            (IVec2::new(0, dc), Some(c_facing))
+        }
+        (None, None) => {
+            (IVec2::new(0, 0), None)
+        }
+    }
+}
+
+/// Run simulation.
+///
+/// In a client-server setup, this will be the server code.
+fn simulate(
+    mut sim_step: ResMut<SimStepNo>,
+    current_level: Res<State<Level>>,
+    levels: Res<Levels>,
+    mut query: Query<(&InputCommand, &mut SimulationState), With<Player>>,
+) {
+    let Ok((cmd, mut sim)) = query.single_mut() else {
+        return;
+    };
+
+    info!("sim: received cmd={}", cmd);
+
+    // advance the sim
+    sim_step.0 = sim_step.0 + 1;
+    sim.prev_pos = sim.pos;
+    sim.prev_facing = sim.facing;
+
+    return;
 }
 
 fn animate_player(
@@ -197,7 +325,7 @@ impl fmt::Display for Facing {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Copy, Clone)]
 struct RenderFrameNo(u32); // monotonic counter
 
 impl fmt::Display for RenderFrameNo {
@@ -261,7 +389,51 @@ impl InputBuffer {
         }
         // info!("record: {}", self);
     }
+
+    fn clear(&mut self) {
+        self.pressed_down = false;
+        self.pressed_down_at = RenderFrameNo::default();
+        self.pressed_left = false;
+        self.pressed_left_at = RenderFrameNo::default();
+        self.pressed_up = false;
+        self.pressed_up_at = RenderFrameNo::default();
+        self.pressed_right = false;
+        self.pressed_right_at = RenderFrameNo::default();
+    }
 }
+
+#[derive(Resource, Debug, Default, Copy, Clone)]
+struct SimStepNo(u32);
+
+impl SimStepNo {
+    fn new(v: u32) -> Self {
+        SimStepNo(v)
+    }
+}
+
+impl fmt::Display for SimStepNo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+#[derive(Component, Debug, Default)]
+struct InputCommand {
+    sim_step: SimStepNo,
+    delta: IVec2, // !IMPORTANT: cheat & flip order: row => y, col => x
+    facing: Option<Facing>,
+}
+
+impl fmt::Display for InputCommand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{{sim_step:{}, delta=(r{}, c{}), facing={:?} }}",
+            self.sim_step, self.delta.y, self.delta.x, self.facing
+        )
+    }
+}
+
 
 #[derive(Component, Debug)]
 struct AnimationState {
