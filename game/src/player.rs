@@ -45,12 +45,6 @@ fn spawn_player(mut commands: Commands, sheets: Res<SpriteSheets>) {
         InputBuffer::default(),
         InputCommand::default(),
         SimulationState::default(),
-        // SimulationState { // debug
-        //     prev_pos: GridPos::new(1, 0),
-        //     pos: init_pos,
-        //     prev_facing: Facing::Down,
-        //     facing: Facing::Down,
-        // },
         AnimationState::default_with_anim_duration(global::PLAYER_ANIMATION_FRAME_DURATION_SECONDS),
     ));
 }
