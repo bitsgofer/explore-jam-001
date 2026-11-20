@@ -75,10 +75,15 @@ impl GridPos {
             self.row as f32 * global::TILE_SIZE_PIXELS as f32,
         );
     }
+
+    /// Translate the original GridPos to a new coordinate.
+    pub fn translate(self, delta_row: i32, delta_col: i32) -> GridPos {
+        GridPos::new(self.row + delta_row, self.col + delta_col)
+    }
 }
 
 /// A Tile.
-#[derive(Clone, Copy, Debug, Component)]
+#[derive(Clone, Copy, Debug, Component, Eq, PartialEq)]
 pub enum Tile {
     Floor,
     Wall,
@@ -116,7 +121,7 @@ impl fmt::Display for GridError {
 
 /// A 2D grid of tiles, representing the layout of the level.
 #[derive(Debug)]
-struct TileGrid {
+pub struct TileGrid {
     // row/col index of the grid's bounds:
     // bottom <= row <= top, left <= col <= right
     bottom: i32,
@@ -267,7 +272,7 @@ pub enum Level {
 pub struct Levels(HashMap<Level, TileGrid>);
 
 impl Levels {
-    fn get(&self, lvl: Level) -> &TileGrid {
+    pub fn get(&self, lvl: Level) -> &TileGrid {
         return &self.0[&lvl];
     }
 }

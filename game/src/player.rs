@@ -10,7 +10,7 @@ use bevy::prelude::{
 use bevy::sprite::Anchor;
 
 use crate::global;
-use crate::level::{GridPos, Level, Levels};
+use crate::level::{GridPos, Level, Levels, Tile, TileGrid};
 use crate::spritesheet::{SpriteSheet, SpriteSheets};
 
 pub struct PlayerPlugin;
@@ -187,22 +187,100 @@ fn player_intent(buffer: &InputBuffer, input: Res<ButtonInput<KeyCode>>) -> (IVe
 /// In a client-server setup, this will be the server code.
 fn simulate(
     mut sim_step: ResMut<SimStepNo>,
-    current_level: Res<State<Level>>,
+    level: Res<State<Level>>,
     levels: Res<Levels>,
     mut query: Query<(&InputCommand, &mut SimulationState), With<Player>>,
 ) {
     let Ok((cmd, mut sim)) = query.single_mut() else {
         return;
     };
+    // info!("sim: received cmd={}", cmd);
 
-    info!("sim: received cmd={}", cmd);
-
-    // advance the sim
-    sim_step.0 = sim_step.0 + 1;
+    // advance sim state (current -> prev)
     sim.prev_pos = sim.pos;
     sim.prev_facing = sim.facing;
+    // advance sim step
+    sim_step.0 = sim_step.0 + 1;
+
+    // run the actual sim
+    let grid = levels.get(*level.get());
+    simulate_player(&mut sim, cmd, grid);
 
     return;
+}
+
+fn simulate_player(sim: &mut SimulationState, cmd: &InputCommand, grid: &TileGrid) {
+    let changes = player_changes(sim.pos, cmd, grid);
+    match changes {
+        Some((pos, facing)) => {
+            sim.pos = pos;
+            sim.facing = facing;
+        },
+        None => {
+            if let Some(facing) = cmd.facing {
+                sim.facing = facing;
+            };
+        },
+    }
+}
+
+/// Simulate where the player will be, based on the level's map.
+fn player_changes(pos: GridPos, cmd: &InputCommand, grid: &TileGrid) -> Option<(GridPos, Facing)> {
+    let delta_row = cmd.delta.y;
+    let delta_col = cmd.delta.x;
+
+    if delta_row == 0 && delta_col == 0 {
+        return None;
+    }
+
+    let vert = if delta_row != 0 {
+        let facing = if delta_row < 0 {
+            Facing::Down
+        } else {
+            Facing::Up
+        };
+        Some((pos.translate(delta_row, 0), facing))
+    } else {
+        None
+    };
+    let horiz = if delta_col != 0 {
+        let facing = if delta_col < 0 {
+            Facing::Left
+        } else {
+            Facing::Right
+        };
+        Some((pos.translate(0, delta_col), facing))
+    } else {
+        None
+    };
+
+        // allow diag
+        if let (Some((row, row_facing)), Some((col, col_facing))) = (vert, horiz) {
+            let diag = pos.translate(delta_row, delta_col);
+            let row_walkable = grid[row] != Tile::Wall;
+            let col_walkable = grid[row] != Tile::Wall;
+            let diag_walkable = grid[diag] != Tile::Wall;
+
+            if diag_walkable && (row_walkable || col_walkable) {
+                let facing = match cmd.facing {
+                    Some(facing) => facing,
+                    None => Facing::Down,
+                };
+                // let facing = cmd.recent.filter(|f| *f == col_facing || *f == row_facing).unwrap_or(hf);
+                return Some((diag, facing));
+            }
+        }
+
+    let recent_is_vert = matches!(cmd.facing, Some(Facing::Up | Facing::Down));
+    let order = if recent_is_vert {
+        [vert, horiz]
+    } else {
+        [horiz, vert]
+    };
+    order
+        .into_iter()
+        .flatten()
+        .find(|(pos, _)| grid[*pos] != Tile::Wall)
 }
 
 fn animate_player(
