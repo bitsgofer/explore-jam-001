@@ -2,7 +2,7 @@ use std::fmt;
 
 use bevy::log::info;
 use bevy::prelude::{
-    App, ButtonInput, Commands, Component, Fixed, FixedUpdate, IVec2, IntoScheduleConfigs, KeyCode,
+    App, ButtonInput, Commands, Component, Fixed, FixedUpdate, IntoScheduleConfigs, KeyCode,
     Name, Plugin, Query, Res, ResMut, Resource, RunFixedMainLoop, RunFixedMainLoopSystems, Sprite,
     Startup, State, Time, Timer, TimerMode, Transform, Update, With,
 };
@@ -10,7 +10,7 @@ use bevy::prelude::{
 use bevy::sprite::Anchor;
 
 use crate::global;
-use crate::level::{GridPos, Level, Levels, Tile, TileGrid};
+use crate::level::{GridPos, GridDelta, Level, Levels, Tile, TileGrid};
 use crate::spritesheet::{SpriteSheet, SpriteSheets};
 
 pub struct PlayerPlugin;
@@ -99,7 +99,7 @@ fn compute_sim_changes(
 
     let command = InputCommand{
         sim_step: *sim_step,
-        delta: IVec2::new(delta.y, delta.x), // TODO: switch to delta type, instead of reversing to get (dr, dc)
+        delta: delta,
         facing,
     };
     *cmd = command;
@@ -112,7 +112,7 @@ fn compute_sim_changes(
 ///
 /// It use the buffered input (since the last SimStep) + the current input
 /// seen this RenderFrame for this calculation.
-fn player_intent(buffer: &InputBuffer, input: Res<ButtonInput<KeyCode>>) -> (IVec2, Option<Facing>) {
+fn player_intent(buffer: &InputBuffer, input: Res<ButtonInput<KeyCode>>) -> (GridDelta, Option<Facing>) {
     // keys pressed in this RenderFrame
     let pressed_down = if input.pressed(KeyCode::ArrowDown) || input.pressed(KeyCode::KeyS) || input.pressed(KeyCode::KeyJ) { true } else { false };
     let pressed_left = if input.pressed(KeyCode::ArrowLeft) || input.pressed(KeyCode::KeyA) || input.pressed(KeyCode::KeyH) { true } else { false };
@@ -131,36 +131,36 @@ fn player_intent(buffer: &InputBuffer, input: Res<ButtonInput<KeyCode>>) -> (IVe
     //
     // we also handle SOCD (Simultaneous Opposing Cardinal Directions),
     // picking only one direction between lef/right or up/down (the latest)
-    let delta_row: Option<(i32, Facing, RenderFrameNo)> = if down && up {
+    let drow: Option<(GridDelta, Facing, RenderFrameNo)> = if down && up {
         if buffer.pressed_down_at.0 > buffer.pressed_up_at.0 {
-            Some((-1, Facing::Down, buffer.pressed_down_at))
+            Some((GridDelta::DOWN, Facing::Down, buffer.pressed_down_at))
         } else {
-            Some((1, Facing::Up, buffer.pressed_up_at))
+            Some((GridDelta::UP, Facing::Up, buffer.pressed_up_at))
         }
     } else if down {
-        Some((-1, Facing::Down, buffer.pressed_down_at))
+        Some((GridDelta::DOWN, Facing::Down, buffer.pressed_down_at))
     } else if up {
-        Some((1, Facing::Up, buffer.pressed_up_at))
+        Some((GridDelta::UP, Facing::Up, buffer.pressed_up_at))
     } else {
         None
     };
-    let delta_col: Option<(i32, Facing, RenderFrameNo)> = if left && right {
+    let dcol: Option<(GridDelta, Facing, RenderFrameNo)> = if left && right {
         if buffer.pressed_left_at.0 > buffer.pressed_right_at.0 {
-            Some((-1, Facing::Left, buffer.pressed_left_at))
+            Some((GridDelta::LEFT, Facing::Left, buffer.pressed_left_at))
         } else {
-            Some((1, Facing::Right, buffer.pressed_right_at))
+            Some((GridDelta::RIGHT, Facing::Right, buffer.pressed_right_at))
         }
     } else if left {
-        Some((-1, Facing::Left, buffer.pressed_left_at))
+        Some((GridDelta::LEFT, Facing::Left, buffer.pressed_left_at))
     } else if right {
-        Some((1, Facing::Right, buffer.pressed_right_at))
+        Some((GridDelta::RIGHT, Facing::Right, buffer.pressed_right_at))
     } else {
         None
     };
 
     // aggregate into delta(row, col)
     // and translate the latest direction key pressed -> Facing direction
-    match (delta_row, delta_col) {
+    match (drow, dcol) {
         (Some((dr, r_facing, r_pressed_at)), Some((dc, c_facing, c_pressed_at))) => {
             let facing = if r_pressed_at.0 > c_pressed_at.0 {
                 r_facing
@@ -168,16 +168,16 @@ fn player_intent(buffer: &InputBuffer, input: Res<ButtonInput<KeyCode>>) -> (IVe
                 c_facing
             };
 
-            (IVec2::new(dr, dc), Some(facing))
+            (dr+dc, Some(facing))
         }
-        (Some((dr, r_facing, r_pressed_at)), None) => {
-            (IVec2::new(dr, 0), Some(r_facing))
+        (Some((dr, r_facing, _)), None) => {
+            (dr, Some(r_facing))
         }
-        (None, Some((dc, c_facing, c_pressed_at))) => {
-            (IVec2::new(0, dc), Some(c_facing))
+        (None, Some((dc, c_facing, _))) => {
+            (dc, Some(c_facing))
         }
         (None, None) => {
-            (IVec2::new(0, 0), None)
+            (GridDelta::ZERO, None)
         }
     }
 }
@@ -226,8 +226,8 @@ fn simulate_player(sim: &mut SimulationState, cmd: &InputCommand, grid: &TileGri
 
 /// Simulate where the player will be, based on the level's map.
 fn player_changes(pos: GridPos, cmd: &InputCommand, grid: &TileGrid) -> Option<(GridPos, Facing)> {
-    let delta_row = cmd.delta.y;
-    let delta_col = cmd.delta.x;
+    let delta_row = cmd.delta.row;
+    let delta_col = cmd.delta.col;
 
     if delta_row == 0 && delta_col == 0 {
         return None;
@@ -498,7 +498,7 @@ impl fmt::Display for SimStepNo {
 #[derive(Component, Debug, Default)]
 struct InputCommand {
     sim_step: SimStepNo,
-    delta: IVec2, // !IMPORTANT: cheat & flip order: row => y, col => x
+    delta: GridDelta,
     facing: Option<Facing>,
 }
 
@@ -506,8 +506,8 @@ impl fmt::Display for InputCommand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{{sim_step:{}, delta=(r{}, c{}), facing={:?} }}",
-            self.sim_step, self.delta.y, self.delta.x, self.facing
+            "{{sim_step:{}, delta={}, facing={:?} }}",
+            self.sim_step, self.delta, self.facing
         )
     }
 }

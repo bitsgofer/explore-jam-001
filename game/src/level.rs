@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fmt;
-use std::ops::{Index, IndexMut};
+use std::ops::{Index, IndexMut, Add, Neg, Sub};
 
 use bevy::prelude::{
     App, AppExtStates, Commands, Component, DespawnOnExit, FromWorld, Name, OnEnter, Plugin, Res,
@@ -51,21 +51,21 @@ fn spawn_level(
 }
 
 /// The `(row, col)` position of a Tile in the TileGrid.
-#[derive(Clone, Copy, Debug, Component, Eq, PartialEq)]
-pub struct GridPos {
+#[derive(Clone, Copy, Debug, Component, Eq, PartialEq, Default)]
+pub struct GridVec2 {
     pub row: i32,
     pub col: i32,
 }
 
-impl Default for GridPos {
-    fn default() -> Self {
-        return GridPos::new(0, 0);
-    }
-}
+impl GridVec2 {
+    pub const ZERO: Self = Self{row: 0, col: 0};
+    pub const DOWN: Self = Self{row: -1, col: 0};
+    pub const LEFT: Self = Self{row: 0, col: -1};
+    pub const UP: Self = Self{row: 1, col: 0};
+    pub const RIGHT: Self = Self{row: 0, col: 1};
 
-impl GridPos {
     pub fn new(row: i32, col: i32) -> Self {
-        return GridPos { row, col };
+        return GridVec2 { row, col };
     }
 
     /// Return `(x, y)` (world) coordinates of the cell's anchor
@@ -78,10 +78,41 @@ impl GridPos {
     }
 
     /// Translate the original GridPos to a new coordinate.
-    pub fn translate(self, delta_row: i32, delta_col: i32) -> GridPos {
-        GridPos::new(self.row + delta_row, self.col + delta_col)
+    pub fn translate(self, delta_row: i32, delta_col: i32) -> GridVec2 {
+        GridVec2::new(self.row + delta_row, self.col + delta_col)
     }
 }
+
+impl fmt::Display for GridVec2 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!( f, "(r{}, c{})", self.row, self.col)
+    }
+}
+
+impl Add<GridVec2> for GridVec2 {
+    type Output = GridVec2;
+    fn add(self, d: GridVec2) -> GridVec2 {
+        return GridDelta::new(self.row + d.row, self.col + d.col);
+    }
+}
+
+impl Neg for GridVec2 {
+    type Output = GridVec2;
+    fn neg(self) -> GridVec2 {
+        return GridDelta::new(-self.row, -self.col);
+    }
+}
+
+impl Sub<GridVec2> for GridVec2 {
+    type Output = GridVec2;
+    fn sub(self, d: GridVec2) -> GridVec2 {
+        return GridDelta::new(self.row - d.row, self.col - d.col);
+    }
+}
+
+pub type GridPos = GridVec2;
+
+pub type GridDelta = GridVec2;
 
 /// A Tile.
 #[derive(Clone, Copy, Debug, Component, Eq, PartialEq)]
@@ -163,13 +194,13 @@ impl TileGrid {
         return (self.right - self.left + 1) as usize;
     }
 
-    fn contains(&self, pos: GridPos) -> bool {
+    fn contains(&self, pos: GridVec2) -> bool {
         return (self.bottom..=self.top).contains(&pos.row)
             && (self.left..=self.right).contains(&pos.col);
     }
 
     /// `GridPos` -> index into `tiles`, or `None` (out of bounds).
-    fn flat_index(&self, pos: GridPos) -> Option<usize> {
+    fn flat_index(&self, pos: GridVec2) -> Option<usize> {
         if !self.contains(pos) {
             return None;
         }
@@ -179,21 +210,21 @@ impl TileGrid {
     }
 
     /// Returns the tile at a `GridPos`, or `None` (out of bounds).
-    fn get(&self, pos: GridPos) -> Option<&Tile> {
+    fn get(&self, pos: GridVec2) -> Option<&Tile> {
         return self.flat_index(pos).map(|i| &self.tiles[i]);
     }
 
     /// Returns a mutable reference to the tile at a `GridPos`, or `None` (out of bounds).
-    fn get_mut(&mut self, pos: GridPos) -> Option<&mut Tile> {
+    fn get_mut(&mut self, pos: GridVec2) -> Option<&mut Tile> {
         let i = self.flat_index(pos)?;
         return Some(&mut self.tiles[i]);
     }
 
     /// Iterator for looping through all tiles.
-    fn iter(&self) -> impl Iterator<Item = (usize, GridPos, Tile)> + '_ {
+    fn iter(&self) -> impl Iterator<Item = (usize, GridVec2, Tile)> + '_ {
         return (self.bottom..=self.top).flat_map(move |row| {
             (self.left..=self.right).map(move |col| {
-                let pos = GridPos::new(row, col);
+                let pos = GridVec2::new(row, col);
                 let index = self.flat_index(pos).unwrap();
                 (index, pos, self.tiles[index])
             })
@@ -223,15 +254,15 @@ impl TileGrid {
         let left = grid.left;
         let right = grid.right;
         for c in grid.left..=grid.right {
-            grid[GridPos::new(bottom, c)] = Tile::Wall;
-            grid[GridPos::new(top, c)] = Tile::Wall;
+            grid[GridVec2::new(bottom, c)] = Tile::Wall;
+            grid[GridVec2::new(top, c)] = Tile::Wall;
         }
         for r in grid.bottom..=grid.top {
-            grid[GridPos::new(r, left)] = Tile::Wall;
-            grid[GridPos::new(r, right)] = Tile::Wall;
+            grid[GridVec2::new(r, left)] = Tile::Wall;
+            grid[GridVec2::new(r, right)] = Tile::Wall;
         }
-        grid[GridPos::new(0, -4)] = Tile::MazeStart;
-        grid[GridPos::new(0, 4)] = Tile::MazeEnd;
+        grid[GridVec2::new(0, -4)] = Tile::MazeStart;
+        grid[GridVec2::new(0, 4)] = Tile::MazeEnd;
 
         return grid;
     }
@@ -243,43 +274,43 @@ impl TileGrid {
         let left = grid.left;
         let right = grid.right;
         for c in grid.left..=grid.right {
-            grid[GridPos::new(bottom, c)] = Tile::Wall;
-            grid[GridPos::new(top, c)] = Tile::Wall;
+            grid[GridVec2::new(bottom, c)] = Tile::Wall;
+            grid[GridVec2::new(top, c)] = Tile::Wall;
         }
         for r in grid.bottom..=grid.top {
-            grid[GridPos::new(r, left)] = Tile::Wall;
-            grid[GridPos::new(r, right)] = Tile::Wall;
+            grid[GridVec2::new(r, left)] = Tile::Wall;
+            grid[GridVec2::new(r, right)] = Tile::Wall;
         }
-        grid[GridPos::new(-4, -8)] = Tile::MazeStart;
-        grid[GridPos::new(4, 8)] = Tile::MazeEnd;
+        grid[GridVec2::new(-4, -8)] = Tile::MazeStart;
+        grid[GridVec2::new(4, 8)] = Tile::MazeEnd;
 
-        grid[GridPos::new(-2, -2)] = Tile::Wall;
-        grid[GridPos::new(-2, 1)] = Tile::Wall;
-        grid[GridPos::new(-1, 1)] = Tile::Wall;
-        grid[GridPos::new(0, 1)] = Tile::Wall;
-        grid[GridPos::new(1, 1)] = Tile::Wall;
-        grid[GridPos::new(2, 1)] = Tile::Wall;
-        grid[GridPos::new(0, 2)] = Tile::Wall;
-        grid[GridPos::new(0, 3)] = Tile::Wall;
-        grid[GridPos::new(1, 4)] = Tile::Wall;
-        grid[GridPos::new(2, 4)] = Tile::Wall;
+        grid[GridVec2::new(-2, -2)] = Tile::Wall;
+        grid[GridVec2::new(-2, 1)] = Tile::Wall;
+        grid[GridVec2::new(-1, 1)] = Tile::Wall;
+        grid[GridVec2::new(0, 1)] = Tile::Wall;
+        grid[GridVec2::new(1, 1)] = Tile::Wall;
+        grid[GridVec2::new(2, 1)] = Tile::Wall;
+        grid[GridVec2::new(0, 2)] = Tile::Wall;
+        grid[GridVec2::new(0, 3)] = Tile::Wall;
+        grid[GridVec2::new(1, 4)] = Tile::Wall;
+        grid[GridVec2::new(2, 4)] = Tile::Wall;
 
         return grid;
     }
 }
 
-impl Index<GridPos> for TileGrid {
+impl Index<GridVec2> for TileGrid {
     type Output = Tile;
 
-    fn index(&self, pos: GridPos) -> &Tile {
+    fn index(&self, pos: GridVec2) -> &Tile {
         return self
             .get(pos)
             .unwrap_or_else(|| panic!("{pos:?} out of grid bounds"));
     }
 }
 
-impl IndexMut<GridPos> for TileGrid {
-    fn index_mut(&mut self, pos: GridPos) -> &mut Tile {
+impl IndexMut<GridVec2> for TileGrid {
+    fn index_mut(&mut self, pos: GridVec2) -> &mut Tile {
         return self
             .get_mut(pos)
             .unwrap_or_else(|| panic!("{pos:?} out of grid bounds"));
