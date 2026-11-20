@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fmt;
-use std::ops::{Index, IndexMut, Add, Neg, Sub};
+use std::ops::{Add, Index, IndexMut, Neg, Sub};
 
 use bevy::prelude::{
     App, AppExtStates, Commands, Component, DespawnOnExit, FromWorld, Name, OnEnter, Plugin, Res,
@@ -58,11 +58,11 @@ pub struct GridVec2 {
 }
 
 impl GridVec2 {
-    pub const ZERO: Self = Self{row: 0, col: 0};
-    pub const DOWN: Self = Self{row: -1, col: 0};
-    pub const LEFT: Self = Self{row: 0, col: -1};
-    pub const UP: Self = Self{row: 1, col: 0};
-    pub const RIGHT: Self = Self{row: 0, col: 1};
+    pub const ZERO: Self = Self { row: 0, col: 0 };
+    pub const DOWN: Self = Self { row: -1, col: 0 };
+    pub const LEFT: Self = Self { row: 0, col: -1 };
+    pub const UP: Self = Self { row: 1, col: 0 };
+    pub const RIGHT: Self = Self { row: 0, col: 1 };
 
     pub fn new(row: i32, col: i32) -> Self {
         return GridVec2 { row, col };
@@ -85,7 +85,7 @@ impl GridVec2 {
 
 impl fmt::Display for GridVec2 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!( f, "(r{}, c{})", self.row, self.col)
+        write!(f, "(r{}, c{})", self.row, self.col)
     }
 }
 

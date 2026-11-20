@@ -2,15 +2,15 @@ use std::fmt;
 
 use bevy::log::info;
 use bevy::prelude::{
-    App, ButtonInput, Commands, Component, Fixed, FixedUpdate, IntoScheduleConfigs, KeyCode,
-    Name, Plugin, Query, Res, ResMut, Resource, RunFixedMainLoop, RunFixedMainLoopSystems, Sprite,
+    App, ButtonInput, Commands, Component, Fixed, FixedUpdate, IntoScheduleConfigs, KeyCode, Name,
+    Plugin, Query, Res, ResMut, Resource, RunFixedMainLoop, RunFixedMainLoopSystems, Sprite,
     Startup, State, Time, Timer, TimerMode, Transform, Update, With,
 };
 
 use bevy::sprite::Anchor;
 
 use crate::global;
-use crate::level::{GridPos, GridDelta, Level, Levels, Tile, TileGrid};
+use crate::level::{GridDelta, GridPos, Level, Levels, Tile, TileGrid};
 use crate::spritesheet::{SpriteSheet, SpriteSheets};
 
 pub struct PlayerPlugin;
@@ -91,9 +91,9 @@ fn compute_sim_changes(
 
     input_buffer.clear();
 
-    let command = InputCommand{
+    let command = InputCommand {
         sim_step: *sim_step,
-        delta: delta,
+        delta,
         facing,
     };
     *cmd = command;
@@ -106,12 +106,43 @@ fn compute_sim_changes(
 ///
 /// It use the buffered input (since the last SimStep) + the current input
 /// seen this RenderFrame for this calculation.
-fn player_intent(buffer: &InputBuffer, input: Res<ButtonInput<KeyCode>>) -> (GridDelta, Option<Facing>) {
+fn player_intent(
+    buffer: &InputBuffer,
+    input: Res<ButtonInput<KeyCode>>,
+) -> (GridDelta, Option<Facing>) {
     // keys pressed in this RenderFrame
-    let pressed_down = if input.pressed(KeyCode::ArrowDown) || input.pressed(KeyCode::KeyS) || input.pressed(KeyCode::KeyJ) { true } else { false };
-    let pressed_left = if input.pressed(KeyCode::ArrowLeft) || input.pressed(KeyCode::KeyA) || input.pressed(KeyCode::KeyH) { true } else { false };
-    let pressed_up = if input.pressed(KeyCode::ArrowUp) || input.pressed(KeyCode::KeyW) || input.pressed(KeyCode::KeyK) { true } else { false };
-    let pressed_right = if input.pressed(KeyCode::ArrowRight) || input.pressed(KeyCode::KeyD) || input.pressed(KeyCode::KeyL) { true } else { false };
+    let pressed_down = if input.pressed(KeyCode::ArrowDown)
+        || input.pressed(KeyCode::KeyS)
+        || input.pressed(KeyCode::KeyJ)
+    {
+        true
+    } else {
+        false
+    };
+    let pressed_left = if input.pressed(KeyCode::ArrowLeft)
+        || input.pressed(KeyCode::KeyA)
+        || input.pressed(KeyCode::KeyH)
+    {
+        true
+    } else {
+        false
+    };
+    let pressed_up = if input.pressed(KeyCode::ArrowUp)
+        || input.pressed(KeyCode::KeyW)
+        || input.pressed(KeyCode::KeyK)
+    {
+        true
+    } else {
+        false
+    };
+    let pressed_right = if input.pressed(KeyCode::ArrowRight)
+        || input.pressed(KeyCode::KeyD)
+        || input.pressed(KeyCode::KeyL)
+    {
+        true
+    } else {
+        false
+    };
 
     // combine pressed_DIRECTION (in this RenderFrame) with the input
     // bufered since the last SimStep (it was not yet handled)
@@ -162,17 +193,11 @@ fn player_intent(buffer: &InputBuffer, input: Res<ButtonInput<KeyCode>>) -> (Gri
                 c_facing
             };
 
-            (dr+dc, Some(facing))
+            (dr + dc, Some(facing))
         }
-        (Some((dr, r_facing, _)), None) => {
-            (dr, Some(r_facing))
-        }
-        (None, Some((dc, c_facing, _))) => {
-            (dc, Some(c_facing))
-        }
-        (None, None) => {
-            (GridDelta::ZERO, None)
-        }
+        (Some((dr, r_facing, _)), None) => (dr, Some(r_facing)),
+        (None, Some((dc, c_facing, _))) => (dc, Some(c_facing)),
+        (None, None) => (GridDelta::ZERO, None),
     }
 }
 
@@ -209,12 +234,12 @@ fn simulate_player(sim: &mut SimulationState, cmd: &InputCommand, grid: &TileGri
         Some((pos, facing)) => {
             sim.pos = pos;
             sim.facing = facing;
-        },
+        }
         None => {
             if let Some(facing) = cmd.facing {
                 sim.facing = facing;
             };
-        },
+        }
     }
 }
 
@@ -248,22 +273,22 @@ fn player_changes(pos: GridPos, cmd: &InputCommand, grid: &TileGrid) -> Option<(
         None
     };
 
-        // allow diag
-        if let (Some((row, row_facing)), Some((col, col_facing))) = (vert, horiz) {
-            let diag = pos.translate(delta_row, delta_col);
-            let row_walkable = grid[row] != Tile::Wall;
-            let col_walkable = grid[row] != Tile::Wall;
-            let diag_walkable = grid[diag] != Tile::Wall;
+    // allow diag
+    if let (Some((row, row_facing)), Some((col, col_facing))) = (vert, horiz) {
+        let diag = pos.translate(delta_row, delta_col);
+        let row_walkable = grid[row] != Tile::Wall;
+        let col_walkable = grid[row] != Tile::Wall;
+        let diag_walkable = grid[diag] != Tile::Wall;
 
-            if diag_walkable && (row_walkable || col_walkable) {
-                let facing = match cmd.facing {
-                    Some(facing) => facing,
-                    None => Facing::Down,
-                };
-                // let facing = cmd.recent.filter(|f| *f == col_facing || *f == row_facing).unwrap_or(hf);
-                return Some((diag, facing));
-            }
+        if diag_walkable && (row_walkable || col_walkable) {
+            let facing = match cmd.facing {
+                Some(facing) => facing,
+                None => Facing::Down,
+            };
+            // let facing = cmd.recent.filter(|f| *f == col_facing || *f == row_facing).unwrap_or(hf);
+            return Some((diag, facing));
         }
+    }
 
     let recent_is_vert = matches!(cmd.facing, Some(Facing::Up | Facing::Down));
     let order = if recent_is_vert {
@@ -505,7 +530,6 @@ impl fmt::Display for InputCommand {
         )
     }
 }
-
 
 #[derive(Component, Debug)]
 struct AnimationState {
