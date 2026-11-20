@@ -79,7 +79,10 @@ impl GridVec2 {
 
     /// Translate the original GridPos to a new coordinate.
     pub fn translate(self, delta_row: i32, delta_col: i32) -> GridVec2 {
-        GridVec2::new(self.row + delta_row, self.col + delta_col)
+        GridVec2 {
+            row: self.row + delta_row,
+            col: self.col + delta_col,
+        }
     }
 }
 
@@ -92,21 +95,30 @@ impl fmt::Display for GridVec2 {
 impl Add<GridVec2> for GridVec2 {
     type Output = GridVec2;
     fn add(self, d: GridVec2) -> GridVec2 {
-        return GridDelta::new(self.row + d.row, self.col + d.col);
+        return GridVec2 {
+            row: self.row + d.row,
+            col: self.col + d.col,
+        };
     }
 }
 
 impl Neg for GridVec2 {
     type Output = GridVec2;
     fn neg(self) -> GridVec2 {
-        return GridDelta::new(-self.row, -self.col);
+        return GridVec2 {
+            row: -self.row,
+            col: -self.col,
+        };
     }
 }
 
 impl Sub<GridVec2> for GridVec2 {
     type Output = GridVec2;
     fn sub(self, d: GridVec2) -> GridVec2 {
-        return GridDelta::new(self.row - d.row, self.col - d.col);
+        return GridVec2 {
+            row: self.row - d.row,
+            col: self.col - d.col,
+        };
     }
 }
 
@@ -224,7 +236,7 @@ impl TileGrid {
     fn iter(&self) -> impl Iterator<Item = (usize, GridVec2, Tile)> + '_ {
         return (self.bottom..=self.top).flat_map(move |row| {
             (self.left..=self.right).map(move |col| {
-                let pos = GridVec2::new(row, col);
+                let pos = GridVec2 { row, col };
                 let index = self.flat_index(pos).unwrap();
                 (index, pos, self.tiles[index])
             })
