@@ -60,9 +60,23 @@ pub struct GridVec2 {
 impl GridVec2 {
     pub const ZERO: Self = Self { row: 0, col: 0 };
     pub const DOWN: Self = Self { row: -1, col: 0 };
+    pub const DOWN_LEFT: Self = Self { row: -1, col: -1 };
     pub const LEFT: Self = Self { row: 0, col: -1 };
+    pub const UP_LEFT: Self = Self { row: 1, col: -1 };
     pub const UP: Self = Self { row: 1, col: 0 };
+    pub const UP_RIGHT: Self = Self { row: 1, col: 1 };
     pub const RIGHT: Self = Self { row: 0, col: 1 };
+    pub const DOWN_RIGHT: Self = Self { row: -1, col: 1 };
+    pub const VALID_MOVES: [GridVec2; 8] = [
+        GridVec2::DOWN,
+        GridVec2::DOWN_RIGHT,
+        GridVec2::LEFT,
+        GridVec2::UP_LEFT,
+        GridVec2::UP,
+        GridVec2::UP_RIGHT,
+        GridVec2::RIGHT,
+        GridVec2::DOWN_RIGHT,
+    ];
 
     pub fn new(row: i32, col: i32) -> Self {
         return GridVec2 { row, col };
@@ -212,7 +226,7 @@ impl TileGrid {
         return (self.right - self.left + 1) as usize;
     }
 
-    fn contains(&self, pos: GridVec2) -> bool {
+    pub fn contains(&self, pos: GridVec2) -> bool {
         return (self.bottom..=self.top).contains(&pos.row)
             && (self.left..=self.right).contains(&pos.col);
     }
@@ -228,12 +242,12 @@ impl TileGrid {
     }
 
     /// Returns the tile at a `GridPos`, or `None` (out of bounds).
-    fn get(&self, pos: GridVec2) -> Option<&Tile> {
+    pub fn get(&self, pos: GridVec2) -> Option<&Tile> {
         return self.flat_index(pos).map(|i| &self.tiles[i]);
     }
 
     /// Returns a mutable reference to the tile at a `GridPos`, or `None` (out of bounds).
-    fn get_mut(&mut self, pos: GridVec2) -> Option<&mut Tile> {
+    pub fn get_mut(&mut self, pos: GridVec2) -> Option<&mut Tile> {
         let i = self.flat_index(pos)?;
         return Some(&mut self.tiles[i]);
     }

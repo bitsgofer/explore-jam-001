@@ -213,7 +213,7 @@ fn simulate(
     let Ok((cmd, mut sim)) = query.single_mut() else {
         return;
     };
-    // info!("sim: received cmd={}", cmd);
+    // info!("sim: received cmd={}; state: pos={}, facing={}", cmd, sim.pos, sim.facing);
 
     // advance sim state (current -> prev)
     sim.prev_pos = sim.pos;
@@ -243,63 +243,86 @@ fn simulate_player(sim: &mut SimulationState, cmd: &InputCommand, grid: &TileGri
     }
 }
 
-/// Simulate where the player will be, based on the level's map.
+/// Determine the player's new position & facing,
+/// or None if there's no delta or the move is blocked.
+///
+/// From pos, validate if we can use InputCommand.delta to move to next_pos,
+/// which is either:
+/// - [Vert]: moved Down/Up
+/// - [Horz]: moved Left/Right
+/// - [Diag]: moved Down + Left/Down + Right/Up + Left/Up + Right
+///
+/// ```text
+/// ┌──────┬──────┐
+/// │      │      │
+/// │ Vert │ Diag │
+/// │      │      │
+/// ├──────┼──────┤
+/// │      │      │
+/// │ pos  │ Horz │
+/// │      │      │
+/// └──────┴──────┘
+/// ```
+///
+/// For next_pos to be a valid move:
+/// - next_pos must be within TileGrid's bounds.
+/// - next_pos must NOT be a wall.
+/// - Reaching next_pos takes one or two 4-directional moves (Up/Down/Left/Right):
+///   - If the next_pos is Vert/Horz, it costs 1 move.
+///   - If next_pos is a Diag, can take either a Vert/Horz move first
+///     before making another move to Diag, for the total of 2 moves.
+///   => This allows for smoother movements in large empty space
+///   => It also allows player to effectively go around valid corners.
+///   => However, they cannot squeeze between diagonal gaps
+///      or run diagonally into a wall, which is logically sound.
+///   => In general, this seems to feel more natural for movement.
+///      We are trying to replicate the same moves found in games like
+///      Stardew Valley, Sea of Stars, etc.
 fn player_changes(pos: GridPos, cmd: &InputCommand, grid: &TileGrid) -> Option<(GridPos, Facing)> {
-    let delta_row = cmd.delta.row;
-    let delta_col = cmd.delta.col;
+    let delta = cmd.delta;
+    let next_pos = pos + delta;
 
-    if delta_row == 0 && delta_col == 0 {
+    if delta == GridDelta::ZERO { // No movement -> no change
         return None;
     }
 
-    let vert = if delta_row != 0 {
-        let facing = if delta_row < 0 {
-            Facing::Down
-        } else {
-            Facing::Up
-        };
-        Some((pos.translate(delta_row, 0), facing))
-    } else {
-        None
+    let is_valid_dest = |p: GridPos, d: GridDelta| -> bool {
+        let next_p = p + d;
+        grid.contains(next_p) && grid[next_p] != Tile::Wall
     };
-    let horiz = if delta_col != 0 {
-        let facing = if delta_col < 0 {
-            Facing::Left
-        } else {
-            Facing::Right
-        };
-        Some((pos.translate(0, delta_col), facing))
-    } else {
-        None
-    };
-
-    // allow diag
-    if let (Some((row, row_facing)), Some((col, col_facing))) = (vert, horiz) {
-        let diag = pos.translate(delta_row, delta_col);
-        let row_walkable = grid[row] != Tile::Wall;
-        let col_walkable = grid[row] != Tile::Wall;
-        let diag_walkable = grid[diag] != Tile::Wall;
-
-        if diag_walkable && (row_walkable || col_walkable) {
-            let facing = match cmd.facing {
-                Some(facing) => facing,
-                None => Facing::Down,
-            };
-            // let facing = cmd.recent.filter(|f| *f == col_facing || *f == row_facing).unwrap_or(hf);
-            return Some((diag, facing));
+    let is_within_two_grid_moves = |p: GridPos, d: GridDelta| -> bool {
+        match d {
+            GridDelta::DOWN | GridDelta::LEFT | GridDelta::UP | GridDelta::RIGHT => true,
+            GridDelta::DOWN_LEFT => {
+                is_valid_dest(p, GridDelta::DOWN) || is_valid_dest(p, GridDelta::LEFT)
+            }
+            GridDelta::UP_LEFT => {
+                is_valid_dest(p, GridDelta::UP) || is_valid_dest(p, GridDelta::LEFT)
+            }
+            GridDelta::UP_RIGHT => {
+                is_valid_dest(p, GridDelta::UP) || is_valid_dest(p, GridDelta::RIGHT)
+            }
+            GridDelta::DOWN_RIGHT => {
+                is_valid_dest(p, GridDelta::DOWN) || is_valid_dest(p, GridDelta::RIGHT)
+            }
+            _ => {
+                panic!(
+                    "player delta is not in GridDelta::VALID_MOVES({:?}); delta={}",
+                    GridDelta::VALID_MOVES,
+                    d
+                );
+            }
         }
-    }
-
-    let recent_is_vert = matches!(cmd.facing, Some(Facing::Up | Facing::Down));
-    let order = if recent_is_vert {
-        [vert, horiz]
-    } else {
-        [horiz, vert]
     };
-    order
-        .into_iter()
-        .flatten()
-        .find(|(pos, _)| grid[*pos] != Tile::Wall)
+    // info!("player_changes: next_pos={}, is_valid_dest={}, is_within_two_grid_moves={}", next_pos, is_valid_dest(pos, delta), is_within_two_grid_moves(pos, delta));
+
+    if is_valid_dest(pos, delta) && is_within_two_grid_moves(pos, delta) {
+        // info!("player_changes: allow move from pos={} -> next_pos={}", pos, next_pos);
+        Some((next_pos, cmd.facing.unwrap_or(Facing::Down)))
+    } else {
+        // info!("player_changes: disallow move from pos={} -> next_pos={}", pos, next_pos);
+        None
+    }
 }
 
 fn animate_player(
