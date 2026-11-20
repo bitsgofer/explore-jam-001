@@ -84,6 +84,12 @@ impl GridVec2 {
             col: self.col + delta_col,
         }
     }
+
+    pub fn abs(self) -> GridVec2 {
+        let r = if self.row < 0 { -self.row } else { self.row };
+        let c = if self.col < 0 { -self.col } else { self.col };
+        GridVec2 { row: r, col: c }
+    }
 }
 
 impl fmt::Display for GridVec2 {
