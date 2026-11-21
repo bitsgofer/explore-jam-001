@@ -49,13 +49,13 @@ fn spawn_player(mut commands: Commands, sheets: Res<SpriteSheets>) {
     ));
 }
 
-/// Every render frame, look at what key(s) player pressed & when (render frame
-/// sequence number) => store into InputBuffer.
+/// Every render frame, look at what key(s) player pressed and when it happened
+/// (by render frame sequence number) => store into InputBuffer.
 ///
-/// If the same key is already pressed, then last write wins (only change the
-/// sequence number). This happens when press + release + press very quickly.
+/// If the same key is already pressed, then last write wins.
+/// This happens when press + release + press very quickly.
 ///
-/// This allow the sim to see all keys pressed since it last run.
+/// The buffer allows the sim to see all keys pressed since the last sim step.
 /// => handle player's intent/input more accurately.
 ///
 /// !IMPORTANT: The sim will also clear the buffer after reading.
@@ -156,7 +156,7 @@ fn player_intent(
     //
     // we also handle SOCD (Simultaneous Opposing Cardinal Directions),
     // picking only one direction between lef/right or up/down (the latest)
-    let drow: Option<(GridDelta, Facing, RenderFrameNo)> = if down && up {
+    let drow: Option<(GridDelta, Facing, InputSeqNo)> = if down && up {
         if buffer.pressed_down_at.0 > buffer.pressed_up_at.0 {
             Some((GridDelta::DOWN, Facing::Down, buffer.pressed_down_at))
         } else {
@@ -169,7 +169,7 @@ fn player_intent(
     } else {
         None
     };
-    let dcol: Option<(GridDelta, Facing, RenderFrameNo)> = if left && right {
+    let dcol: Option<(GridDelta, Facing, InputSeqNo)> = if left && right {
         if buffer.pressed_left_at.0 > buffer.pressed_right_at.0 {
             Some((GridDelta::LEFT, Facing::Left, buffer.pressed_left_at))
         } else {
@@ -446,25 +446,51 @@ impl fmt::Display for Facing {
 }
 
 #[derive(Debug, Default, Copy, Clone)]
-struct RenderFrameNo(u32); // monotonic counter
+struct InputSeqNo(u32);
 
-impl fmt::Display for RenderFrameNo {
+impl InputSeqNo {
+    fn new(v: u32) -> Self {
+        return InputSeqNo(v);
+    }
+
+    fn inc(&mut self) {
+        self.0 += 1;
+    }
+}
+
+impl fmt::Display for InputSeqNo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-#[derive(Component, Debug, Default)]
+#[derive(Component, Debug)]
 struct InputBuffer {
-    seq_no: RenderFrameNo,
+    seq_no: InputSeqNo,
     pressed_down: bool,
-    pressed_down_at: RenderFrameNo,
+    pressed_down_at: InputSeqNo,
     pressed_left: bool,
-    pressed_left_at: RenderFrameNo,
+    pressed_left_at: InputSeqNo,
     pressed_up: bool,
-    pressed_up_at: RenderFrameNo,
+    pressed_up_at: InputSeqNo,
     pressed_right: bool,
-    pressed_right_at: RenderFrameNo,
+    pressed_right_at: InputSeqNo,
+}
+
+impl InputBuffer {
+    fn default() -> Self {
+        InputBuffer {
+            seq_no: InputSeqNo::new(1),
+            pressed_down: false,
+            pressed_down_at: InputSeqNo::new(0),
+            pressed_left: false,
+            pressed_left_at: InputSeqNo::new(0),
+            pressed_up: false,
+            pressed_up_at: InputSeqNo::new(0),
+            pressed_right: false,
+            pressed_right_at: InputSeqNo::new(0),
+        }
+    }
 }
 
 impl fmt::Display for InputBuffer {
@@ -491,19 +517,19 @@ impl InputBuffer {
         match key {
             KeyCode::ArrowDown | KeyCode::KeyS | KeyCode::KeyJ => {
                 self.pressed_down = true;
-                self.pressed_down_at = RenderFrameNo(self.seq_no.0);
+                self.pressed_down_at = InputSeqNo(self.seq_no.0);
             }
             KeyCode::ArrowLeft | KeyCode::KeyA | KeyCode::KeyH => {
                 self.pressed_left = true;
-                self.pressed_left_at = RenderFrameNo(self.seq_no.0);
+                self.pressed_left_at = InputSeqNo(self.seq_no.0);
             }
             KeyCode::ArrowUp | KeyCode::KeyW | KeyCode::KeyK => {
                 self.pressed_up = true;
-                self.pressed_up_at = RenderFrameNo(self.seq_no.0);
+                self.pressed_up_at = InputSeqNo(self.seq_no.0);
             }
             KeyCode::ArrowRight | KeyCode::KeyD | KeyCode::KeyL => {
                 self.pressed_right = true;
-                self.pressed_right_at = RenderFrameNo(self.seq_no.0);
+                self.pressed_right_at = InputSeqNo(self.seq_no.0);
             }
             _ => {}
         }
@@ -512,13 +538,13 @@ impl InputBuffer {
 
     fn clear(&mut self) {
         self.pressed_down = false;
-        self.pressed_down_at = RenderFrameNo::default();
+        self.pressed_down_at = InputSeqNo::default();
         self.pressed_left = false;
-        self.pressed_left_at = RenderFrameNo::default();
+        self.pressed_left_at = InputSeqNo::default();
         self.pressed_up = false;
-        self.pressed_up_at = RenderFrameNo::default();
+        self.pressed_up_at = InputSeqNo::default();
         self.pressed_right = false;
-        self.pressed_right_at = RenderFrameNo::default();
+        self.pressed_right_at = InputSeqNo::default();
     }
 }
 
