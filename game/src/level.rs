@@ -4,10 +4,11 @@ use std::ops::{Add, Index, IndexMut, Neg, Sub};
 
 use bevy::prelude::{
     App, AppExtStates, Commands, Component, DespawnOnExit, FromWorld, Name, OnEnter, Plugin, Res,
-    Resource, State, States, Transform, Vec2, Visibility, World,
+    Resource, State, SubStates, Transform, Vec2, Visibility, World,
 };
 use bevy::sprite::Anchor;
 
+use crate::game_state::{GameState, GameStatePlugin};
 use crate::global;
 use crate::spritesheet::SpriteSheet;
 use crate::spritesheet::SpriteSheets;
@@ -16,8 +17,13 @@ pub struct LevelPlugin;
 
 impl Plugin for LevelPlugin {
     fn build(&self, app: &mut App) {
+        assert!(
+            app.is_plugin_added::<GameStatePlugin>(),
+            "LevelPlugin requires GameStatePlugin"
+        );
+
         app.init_resource::<Levels>()
-            .insert_state(Level::_2)
+            .add_sub_state::<Level>()
             .add_systems(OnEnter(Level::_0), spawn_level)
             .add_systems(OnEnter(Level::_1), spawn_level)
             .add_systems(OnEnter(Level::_2), spawn_level);
@@ -393,10 +399,12 @@ impl IndexMut<GridVec2> for TileGrid {
 #[require(Transform, Visibility)]
 struct LevelRoot;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, States)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, SubStates, Default)]
+#[source(GameState = GameState::Intro | GameState::Playing)]
 pub enum Level {
     _0,
     _1,
+    #[default]
     _2,
 }
 
