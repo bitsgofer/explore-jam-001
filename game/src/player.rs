@@ -32,19 +32,27 @@ impl Plugin for PlayerPlugin {
     }
 }
 
-fn spawn_player(mut commands: Commands, sheets: Res<SpriteSheets>) {
+fn spawn_player(
+    mut commands: Commands,
+    sheets: Res<SpriteSheets>,
+    level: Res<State<Level>>,
+    levels: Res<Levels>,
+) {
     let sheet = sheets.get(SpriteSheet::Player);
-    let init_pos = GridPos::new(0, 0);
+    let grid = levels.get(*level.get());
     commands.spawn((
         Player,
-        init_pos,
         sheet.sprite(0 as usize),
-        Transform::from_translation(init_pos.to_xy().extend(global::PLAYER_Z)),
+        Transform::default(),
         Anchor::BOTTOM_LEFT,
         Name::new(format!("Player")),
         InputBuffer::default(),
         InputCommand::default(),
-        SimulationState::default(),
+        SimulationState {
+            pos: grid.start(),
+            prev_pos: grid.start(),
+            ..Default::default()
+        },
         AnimationState::default_with_anim_duration(global::PLAYER_ANIMATION_FRAME_DURATION_SECONDS),
     ));
 }
