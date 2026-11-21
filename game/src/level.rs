@@ -194,6 +194,8 @@ pub struct TileGrid {
     right: i32,
     // (row, col) -> tiles[row*cols + col]
     tiles: Vec<Tile>,
+    start: GridPos,
+    end: GridPos,
 }
 
 impl TileGrid {
@@ -213,9 +215,41 @@ impl TileGrid {
             top,
             right,
             tiles: vec![Tile::Floor; rows * cols],
+            start: GridPos {
+                // change with set_start()
+                row: i32::MIN,
+                col: i32::MIN,
+            },
+            end: GridPos {
+                // change with set_end()
+                row: i32::MAX,
+                col: i32::MAX,
+            },
         };
 
         return Ok(grid);
+    }
+
+    fn set_start(mut self, pos: GridPos) -> Self {
+        self[pos] = Tile::MazeStart;
+        self.start = pos;
+
+        return self;
+    }
+
+    fn set_end(mut self, pos: GridPos) -> Self {
+        self[pos] = Tile::MazeEnd;
+        self.end = pos;
+
+        return self;
+    }
+
+    pub fn start(&self) -> GridPos {
+        self.start
+    }
+
+    pub fn end(&self) -> GridPos {
+        self.end
     }
 
     fn rows(&self) -> usize {
@@ -274,13 +308,20 @@ impl TileGrid {
     }
 
     fn lvl_0() -> Self {
-        let grid = TileGrid::new(-5, -9, 5, 9).unwrap();
+        let grid = TileGrid::new(-5, -9, 5, 9)
+            .unwrap()
+            .set_start(GridVec2::new(-2, -2))
+            .set_end(GridVec2::new(2, 2));
 
         return grid;
     }
 
     fn lvl_1() -> Self {
-        let mut grid = TileGrid::new(-1, -5, 1, 5).unwrap();
+        let mut grid = TileGrid::new(-1, -5, 1, 5)
+            .unwrap()
+            .set_start(GridVec2::new(0, -4))
+            .set_end(GridVec2::new(0, 4));
+
         let bottom = grid.bottom;
         let top = grid.top;
         let left = grid.left;
@@ -293,14 +334,16 @@ impl TileGrid {
             grid[GridVec2::new(r, left)] = Tile::Wall;
             grid[GridVec2::new(r, right)] = Tile::Wall;
         }
-        grid[GridVec2::new(0, -4)] = Tile::MazeStart;
-        grid[GridVec2::new(0, 4)] = Tile::MazeEnd;
 
         return grid;
     }
 
     fn lvl_2() -> Self {
-        let mut grid = TileGrid::new(-5, -9, 5, 9).unwrap();
+        let mut grid = TileGrid::new(-5, -9, 5, 9)
+            .unwrap()
+            .set_start(GridVec2::new(-4, -8))
+            .set_end(GridVec2::new(4, 8));
+
         let bottom = grid.bottom;
         let top = grid.top;
         let left = grid.left;
@@ -313,9 +356,6 @@ impl TileGrid {
             grid[GridVec2::new(r, left)] = Tile::Wall;
             grid[GridVec2::new(r, right)] = Tile::Wall;
         }
-        grid[GridVec2::new(-4, -8)] = Tile::MazeStart;
-        grid[GridVec2::new(4, 8)] = Tile::MazeEnd;
-
         grid[GridVec2::new(-2, -2)] = Tile::Wall;
         grid[GridVec2::new(-2, 1)] = Tile::Wall;
         grid[GridVec2::new(-1, 1)] = Tile::Wall;
