@@ -26,7 +26,9 @@ impl Plugin for LevelPlugin {
             .add_sub_state::<Level>()
             .add_systems(OnEnter(Level::_0), spawn_level)
             .add_systems(OnEnter(Level::_1), spawn_level)
-            .add_systems(OnEnter(Level::_2), spawn_level);
+            .add_systems(OnEnter(Level::_2), spawn_level)
+            .add_systems(OnEnter(Level::_3), spawn_level)
+            .add_systems(OnEnter(Level::_4), spawn_level);
     }
 }
 
@@ -310,6 +312,8 @@ impl TileGrid {
             Level::_0 => Self::lvl_0(),
             Level::_1 => Self::lvl_1(),
             Level::_2 => Self::lvl_2(),
+            Level::_3 => Self::lvl_3(),
+            Level::_4 => Self::lvl_4(),
         }
     }
 
@@ -362,16 +366,242 @@ impl TileGrid {
             grid[GridVec2::new(r, left)] = Tile::Wall;
             grid[GridVec2::new(r, right)] = Tile::Wall;
         }
-        grid[GridVec2::new(-2, -2)] = Tile::Wall;
-        grid[GridVec2::new(-2, 1)] = Tile::Wall;
-        grid[GridVec2::new(-1, 1)] = Tile::Wall;
-        grid[GridVec2::new(0, 1)] = Tile::Wall;
-        grid[GridVec2::new(1, 1)] = Tile::Wall;
-        grid[GridVec2::new(2, 1)] = Tile::Wall;
-        grid[GridVec2::new(0, 2)] = Tile::Wall;
-        grid[GridVec2::new(0, 3)] = Tile::Wall;
-        grid[GridVec2::new(1, 4)] = Tile::Wall;
-        grid[GridVec2::new(2, 4)] = Tile::Wall;
+        grid[GridPos::new(-4, -3)] = Tile::Wall;
+        grid[GridPos::new(-3, -7)] = Tile::Wall;
+        grid[GridPos::new(-3, -6)] = Tile::Wall;
+        grid[GridPos::new(-3, -5)] = Tile::Wall;
+        grid[GridPos::new(-3, -4)] = Tile::Wall;
+        grid[GridPos::new(-3, -3)] = Tile::Wall;
+        grid[GridPos::new(-3, -1)] = Tile::Wall;
+        grid[GridPos::new(-3, 1)] = Tile::Wall;
+        grid[GridPos::new(-3, 3)] = Tile::Wall;
+        grid[GridPos::new(-3, 4)] = Tile::Wall;
+        grid[GridPos::new(-3, 5)] = Tile::Wall;
+        grid[GridPos::new(-3, 6)] = Tile::Wall;
+        grid[GridPos::new(-3, 7)] = Tile::Wall;
+        grid[GridPos::new(-3, 8)] = Tile::Wall;
+        grid[GridPos::new(-2, -1)] = Tile::Wall;
+        grid[GridPos::new(-2, 1)] = Tile::Wall;
+        grid[GridPos::new(-2, 5)] = Tile::Wall;
+        grid[GridPos::new(-1, -7)] = Tile::Wall;
+        grid[GridPos::new(-1, -5)] = Tile::Wall;
+        grid[GridPos::new(-1, -3)] = Tile::Wall;
+        grid[GridPos::new(-1, -2)] = Tile::Wall;
+        grid[GridPos::new(-1, -1)] = Tile::Wall;
+        grid[GridPos::new(-1, 0)] = Tile::Wall;
+        grid[GridPos::new(-1, 1)] = Tile::Wall;
+        grid[GridPos::new(-1, 2)] = Tile::Wall;
+        grid[GridPos::new(-1, 3)] = Tile::Wall;
+        grid[GridPos::new(-1, 5)] = Tile::Wall;
+        grid[GridPos::new(-1, 7)] = Tile::Wall;
+        grid[GridPos::new(-1, 8)] = Tile::Wall;
+        grid[GridPos::new(0, -7)] = Tile::Wall;
+        grid[GridPos::new(0, -5)] = Tile::Wall;
+        grid[GridPos::new(0, 3)] = Tile::Wall;
+        grid[GridPos::new(1, -7)] = Tile::Wall;
+        grid[GridPos::new(1, -5)] = Tile::Wall;
+        grid[GridPos::new(1, -3)] = Tile::Wall;
+        grid[GridPos::new(1, -2)] = Tile::Wall;
+        grid[GridPos::new(1, -1)] = Tile::Wall;
+        grid[GridPos::new(1, 1)] = Tile::Wall;
+        grid[GridPos::new(1, 2)] = Tile::Wall;
+        grid[GridPos::new(1, 3)] = Tile::Wall;
+        grid[GridPos::new(1, 4)] = Tile::Wall;
+        grid[GridPos::new(1, 5)] = Tile::Wall;
+        grid[GridPos::new(1, 7)] = Tile::Wall;
+        grid[GridPos::new(1, 8)] = Tile::Wall;
+        grid[GridPos::new(2, -7)] = Tile::Wall;
+        grid[GridPos::new(2, -5)] = Tile::Wall;
+        grid[GridPos::new(2, -3)] = Tile::Wall;
+        grid[GridPos::new(2, 5)] = Tile::Wall;
+        grid[GridPos::new(2, 7)] = Tile::Wall;
+        grid[GridPos::new(3, -7)] = Tile::Wall;
+        grid[GridPos::new(3, -6)] = Tile::Wall;
+        grid[GridPos::new(3, -5)] = Tile::Wall;
+        grid[GridPos::new(3, -3)] = Tile::Wall;
+        grid[GridPos::new(3, -2)] = Tile::Wall;
+        grid[GridPos::new(3, -1)] = Tile::Wall;
+        grid[GridPos::new(3, 1)] = Tile::Wall;
+        grid[GridPos::new(3, 3)] = Tile::Wall;
+        grid[GridPos::new(3, 4)] = Tile::Wall;
+        grid[GridPos::new(3, 5)] = Tile::Wall;
+        grid[GridPos::new(3, 7)] = Tile::Wall;
+        grid[GridPos::new(4, -5)] = Tile::Wall;
+        grid[GridPos::new(4, -1)] = Tile::Wall;
+        grid[GridPos::new(4, 1)] = Tile::Wall;
+        grid[GridPos::new(4, 5)] = Tile::Wall;
+
+        return grid;
+    }
+
+    fn lvl_3() -> Self {
+        let mut grid = TileGrid::new(-5, -9, 5, 9)
+            .unwrap()
+            .set_start(GridVec2::new(-4, -8))
+            .set_end(GridVec2::new(4, 8));
+
+        let bottom = grid.bottom;
+        let top = grid.top;
+        let left = grid.left;
+        let right = grid.right;
+        for c in grid.left..=grid.right {
+            grid[GridVec2::new(bottom, c)] = Tile::Wall;
+            grid[GridVec2::new(top, c)] = Tile::Wall;
+        }
+        for r in grid.bottom..=grid.top {
+            grid[GridVec2::new(r, left)] = Tile::Wall;
+            grid[GridVec2::new(r, right)] = Tile::Wall;
+        }
+        grid[GridPos::new(-4, -1)] = Tile::Wall;
+        grid[GridPos::new(-4, 5)] = Tile::Wall;
+        grid[GridPos::new(-3, -8)] = Tile::Wall;
+        grid[GridPos::new(-3, -7)] = Tile::Wall;
+        grid[GridPos::new(-3, -5)] = Tile::Wall;
+        grid[GridPos::new(-3, -4)] = Tile::Wall;
+        grid[GridPos::new(-3, -3)] = Tile::Wall;
+        grid[GridPos::new(-3, -2)] = Tile::Wall;
+        grid[GridPos::new(-3, -1)] = Tile::Wall;
+        grid[GridPos::new(-3, 0)] = Tile::Wall;
+        grid[GridPos::new(-3, 1)] = Tile::Wall;
+        grid[GridPos::new(-3, 3)] = Tile::Wall;
+        grid[GridPos::new(-3, 4)] = Tile::Wall;
+        grid[GridPos::new(-3, 5)] = Tile::Wall;
+        grid[GridPos::new(-3, 7)] = Tile::Wall;
+        grid[GridPos::new(-3, 8)] = Tile::Wall;
+        grid[GridPos::new(-2, -5)] = Tile::Wall;
+        grid[GridPos::new(-2, -1)] = Tile::Wall;
+        grid[GridPos::new(-1, -8)] = Tile::Wall;
+        grid[GridPos::new(-1, -7)] = Tile::Wall;
+        grid[GridPos::new(-1, -5)] = Tile::Wall;
+        grid[GridPos::new(-1, -3)] = Tile::Wall;
+        grid[GridPos::new(-1, -1)] = Tile::Wall;
+        grid[GridPos::new(-1, 1)] = Tile::Wall;
+        grid[GridPos::new(-1, 2)] = Tile::Wall;
+        grid[GridPos::new(-1, 3)] = Tile::Wall;
+        grid[GridPos::new(-1, 4)] = Tile::Wall;
+        grid[GridPos::new(-1, 5)] = Tile::Wall;
+        grid[GridPos::new(-1, 6)] = Tile::Wall;
+        grid[GridPos::new(-1, 7)] = Tile::Wall;
+        grid[GridPos::new(0, -3)] = Tile::Wall;
+        grid[GridPos::new(0, -1)] = Tile::Wall;
+        grid[GridPos::new(0, 5)] = Tile::Wall;
+        grid[GridPos::new(1, -7)] = Tile::Wall;
+        grid[GridPos::new(1, -6)] = Tile::Wall;
+        grid[GridPos::new(1, -5)] = Tile::Wall;
+        grid[GridPos::new(1, -4)] = Tile::Wall;
+        grid[GridPos::new(1, -3)] = Tile::Wall;
+        grid[GridPos::new(1, -1)] = Tile::Wall;
+        grid[GridPos::new(1, 0)] = Tile::Wall;
+        grid[GridPos::new(1, 1)] = Tile::Wall;
+        grid[GridPos::new(1, 3)] = Tile::Wall;
+        grid[GridPos::new(1, 5)] = Tile::Wall;
+        grid[GridPos::new(1, 6)] = Tile::Wall;
+        grid[GridPos::new(1, 7)] = Tile::Wall;
+        grid[GridPos::new(2, -5)] = Tile::Wall;
+        grid[GridPos::new(2, 3)] = Tile::Wall;
+        grid[GridPos::new(2, 5)] = Tile::Wall;
+        grid[GridPos::new(3, -7)] = Tile::Wall;
+        grid[GridPos::new(3, -5)] = Tile::Wall;
+        grid[GridPos::new(3, -4)] = Tile::Wall;
+        grid[GridPos::new(3, -3)] = Tile::Wall;
+        grid[GridPos::new(3, -1)] = Tile::Wall;
+        grid[GridPos::new(3, 0)] = Tile::Wall;
+        grid[GridPos::new(3, 1)] = Tile::Wall;
+        grid[GridPos::new(3, 3)] = Tile::Wall;
+        grid[GridPos::new(3, 4)] = Tile::Wall;
+        grid[GridPos::new(3, 5)] = Tile::Wall;
+        grid[GridPos::new(3, 6)] = Tile::Wall;
+        grid[GridPos::new(3, 7)] = Tile::Wall;
+        grid[GridPos::new(4, -7)] = Tile::Wall;
+        grid[GridPos::new(4, -3)] = Tile::Wall;
+        grid[GridPos::new(4, -1)] = Tile::Wall;
+        grid[GridPos::new(4, 7)] = Tile::Wall;
+
+        return grid;
+    }
+
+    fn lvl_4() -> Self {
+        let mut grid = TileGrid::new(-5, -9, 5, 9)
+            .unwrap()
+            .set_start(GridVec2::new(-4, -8))
+            .set_end(GridVec2::new(4, 8));
+
+        let bottom = grid.bottom;
+        let top = grid.top;
+        let left = grid.left;
+        let right = grid.right;
+        for c in grid.left..=grid.right {
+            grid[GridVec2::new(bottom, c)] = Tile::Wall;
+            grid[GridVec2::new(top, c)] = Tile::Wall;
+        }
+        for r in grid.bottom..=grid.top {
+            grid[GridVec2::new(r, left)] = Tile::Wall;
+            grid[GridVec2::new(r, right)] = Tile::Wall;
+        }
+        grid[GridPos::new(-4, -3)] = Tile::Wall;
+        grid[GridPos::new(-4, 5)] = Tile::Wall;
+        grid[GridPos::new(-3, -8)] = Tile::Wall;
+        grid[GridPos::new(-3, -7)] = Tile::Wall;
+        grid[GridPos::new(-3, -6)] = Tile::Wall;
+        grid[GridPos::new(-3, -5)] = Tile::Wall;
+        grid[GridPos::new(-3, -3)] = Tile::Wall;
+        grid[GridPos::new(-3, -1)] = Tile::Wall;
+        grid[GridPos::new(-3, 0)] = Tile::Wall;
+        grid[GridPos::new(-3, 1)] = Tile::Wall;
+        grid[GridPos::new(-3, 2)] = Tile::Wall;
+        grid[GridPos::new(-3, 3)] = Tile::Wall;
+        grid[GridPos::new(-3, 5)] = Tile::Wall;
+        grid[GridPos::new(-3, 6)] = Tile::Wall;
+        grid[GridPos::new(-3, 7)] = Tile::Wall;
+        grid[GridPos::new(-2, -3)] = Tile::Wall;
+        grid[GridPos::new(-2, -1)] = Tile::Wall;
+        grid[GridPos::new(-2, 3)] = Tile::Wall;
+        grid[GridPos::new(-2, 5)] = Tile::Wall;
+        grid[GridPos::new(-1, -7)] = Tile::Wall;
+        grid[GridPos::new(-1, -6)] = Tile::Wall;
+        grid[GridPos::new(-1, -5)] = Tile::Wall;
+        grid[GridPos::new(-1, -4)] = Tile::Wall;
+        grid[GridPos::new(-1, -3)] = Tile::Wall;
+        grid[GridPos::new(-1, -1)] = Tile::Wall;
+        grid[GridPos::new(-1, 0)] = Tile::Wall;
+        grid[GridPos::new(-1, 1)] = Tile::Wall;
+        grid[GridPos::new(-1, 3)] = Tile::Wall;
+        grid[GridPos::new(-1, 5)] = Tile::Wall;
+        grid[GridPos::new(-1, 7)] = Tile::Wall;
+        grid[GridPos::new(0, -7)] = Tile::Wall;
+        grid[GridPos::new(0, -1)] = Tile::Wall;
+        grid[GridPos::new(0, 3)] = Tile::Wall;
+        grid[GridPos::new(0, 7)] = Tile::Wall;
+        grid[GridPos::new(1, -7)] = Tile::Wall;
+        grid[GridPos::new(1, -5)] = Tile::Wall;
+        grid[GridPos::new(1, -4)] = Tile::Wall;
+        grid[GridPos::new(1, -3)] = Tile::Wall;
+        grid[GridPos::new(1, -2)] = Tile::Wall;
+        grid[GridPos::new(1, -1)] = Tile::Wall;
+        grid[GridPos::new(1, 1)] = Tile::Wall;
+        grid[GridPos::new(1, 2)] = Tile::Wall;
+        grid[GridPos::new(1, 3)] = Tile::Wall;
+        grid[GridPos::new(1, 4)] = Tile::Wall;
+        grid[GridPos::new(1, 5)] = Tile::Wall;
+        grid[GridPos::new(1, 6)] = Tile::Wall;
+        grid[GridPos::new(1, 7)] = Tile::Wall;
+        grid[GridPos::new(2, -7)] = Tile::Wall;
+        grid[GridPos::new(2, -5)] = Tile::Wall;
+        grid[GridPos::new(2, -1)] = Tile::Wall;
+        grid[GridPos::new(3, -7)] = Tile::Wall;
+        grid[GridPos::new(3, -5)] = Tile::Wall;
+        grid[GridPos::new(3, -3)] = Tile::Wall;
+        grid[GridPos::new(3, -1)] = Tile::Wall;
+        grid[GridPos::new(3, 1)] = Tile::Wall;
+        grid[GridPos::new(3, 2)] = Tile::Wall;
+        grid[GridPos::new(3, 3)] = Tile::Wall;
+        grid[GridPos::new(3, 4)] = Tile::Wall;
+        grid[GridPos::new(3, 5)] = Tile::Wall;
+        grid[GridPos::new(3, 6)] = Tile::Wall;
+        grid[GridPos::new(3, 7)] = Tile::Wall;
+        grid[GridPos::new(3, 8)] = Tile::Wall;
+        grid[GridPos::new(4, -5)] = Tile::Wall;
+        grid[GridPos::new(4, -3)] = Tile::Wall;
 
         return grid;
     }
@@ -403,13 +633,16 @@ struct LevelRoot;
 #[source(GameState = GameState::Intro | GameState::Playing)]
 pub enum Level {
     _0,
-    _1,
     #[default]
+    _1,
     _2,
+    _3,
+    _4,
 }
 
 impl Level {
-    const ALL: [Level; 3] = [Level::_0, Level::_1, Level::_2];
+    const TO_INIT: [Level; 5] = [Level::_0, Level::_1, Level::_2, Level::_3, Level::_4];
+    pub const PLAYABLE: [Level; 3] = [Level::_2, Level::_3, Level::_4];
 }
 
 // fn on_maze_end_reached(mut next: ResMut<NextState<Level>>) {
@@ -429,7 +662,7 @@ impl Levels {
 impl FromWorld for Levels {
     fn from_world(_: &mut World) -> Self {
         let mut levels = HashMap::new();
-        for lvl in Level::ALL {
+        for lvl in Level::TO_INIT {
             levels.insert(lvl, TileGrid::for_level(lvl));
         }
 
