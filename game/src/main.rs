@@ -6,11 +6,13 @@ use bevy::prelude::{
 };
 use bevy::utils::default;
 
+mod game_state;
 mod global;
 mod level;
 mod player;
 mod spritesheet;
 
+use crate::game_state::GameStatePlugin;
 use crate::level::LevelPlugin;
 use crate::player::PlayerPlugin;
 use crate::spritesheet::SpriteSheetPlugin;
@@ -35,6 +37,7 @@ fn main() {
         )
         .add_systems(Startup, setup_camera)
         .add_plugins(SpriteSheetPlugin)
+        .add_plugins(GameStatePlugin)
         .add_plugins(LevelPlugin)
         .add_plugins(PlayerPlugin)
         .run();
