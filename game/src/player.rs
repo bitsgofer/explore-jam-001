@@ -76,7 +76,7 @@ fn collect_input(
 
 /// Calculate the player's input towards the simulation.
 ///
-/// In a client-server setup, this will be the client code.
+/// In a client-server setup, this will be in the client code.
 fn compute_sim_changes(
     sim_step: Res<SimStepNo>,
     input: Res<ButtonInput<KeyCode>>,
@@ -282,7 +282,8 @@ fn player_changes(pos: GridPos, cmd: &InputCommand, grid: &TileGrid) -> Option<(
     let delta = cmd.delta;
     let next_pos = pos + delta;
 
-    if delta == GridDelta::ZERO { // No movement -> no change
+    if delta == GridDelta::ZERO {
+        // No movement -> no change
         return None;
     }
 
@@ -553,7 +554,11 @@ struct SimStepNo(u32);
 
 impl SimStepNo {
     fn new(v: u32) -> Self {
-        SimStepNo(v)
+        return SimStepNo(v);
+    }
+
+    fn inc(&mut self) {
+        self.0 += 1;
     }
 }
 
