@@ -1,10 +1,14 @@
 use std::fmt;
 
+use rand::SeedableRng;
+use rand::prelude::IndexedRandom;
+use rand::rngs::Xoshiro128PlusPlus;
+
 use bevy::log::info;
 use bevy::prelude::{
     App, ButtonInput, Commands, Component, Fixed, FixedUpdate, IntoScheduleConfigs, KeyCode, Name,
-    Plugin, Query, Res, ResMut, Resource, RunFixedMainLoop, RunFixedMainLoopSystems, Sprite,
-    Startup, State, Time, Timer, TimerMode, Transform, Update, With,
+    NextState, Plugin, Query, Res, ResMut, Resource, RunFixedMainLoop, RunFixedMainLoopSystems,
+    Sprite, Startup, State, Time, Timer, TimerMode, Transform, Update, With,
 };
 
 use bevy::sprite::Anchor;
@@ -26,7 +30,10 @@ impl Plugin for PlayerPlugin {
                 RunFixedMainLoop,
                 collect_input.in_set(RunFixedMainLoopSystems::BeforeFixedMainLoop),
             ) // per render frame, but before FixedUpdate (sim) // !IMPORTANT
-            .add_systems(FixedUpdate, (compute_sim_changes, simulate).chain()) // per sim step
+            .add_systems(
+                FixedUpdate,
+                (compute_sim_changes, simulate, check_win_condition).chain(),
+            ) // per sim step
             .add_systems(Update, animate_player); // per render frame
         return;
     }
@@ -233,6 +240,44 @@ fn simulate(
     let grid = levels.get(*level.get());
     simulate_player(&mut sim, cmd, grid);
 
+    return;
+}
+
+fn check_win_condition(
+    mut rng: ResMut<GameRng>,
+    level: Res<State<Level>>,
+    levels: Res<Levels>,
+    mut next_level: ResMut<NextState<Level>>,
+    mut query: Query<&mut SimulationState, With<Player>>,
+) {
+    let Ok(mut sim) = query.single_mut() else {
+        return;
+    };
+
+    let lvl = *level.get();
+    if sim.pos != levels.get(lvl).end() {
+        return;
+    }
+
+    let mut next: Level = lvl;
+    while next == lvl {
+        next = rng
+            .choose(&Level::PLAYABLE)
+            .expect("Level::PLAYABLE is never empty");
+    }
+    info!(
+        "maze end reached: change level from={:?} -> to={:?}",
+        lvl, next
+    );
+
+    next_level.set(next);
+
+    // Reset player's position.
+    // NOTE: Need to set both pos and prev_pos, so animate_player() doesn't
+    // animate the player fro last Tile::MazeEnd to the new Tile::MazeStart.
+    let start = levels.get(next).start();
+    sim.pos = start;
+    sim.prev_pos = start;
     return;
 }
 
@@ -628,4 +673,17 @@ struct SimulationState {
     prev_pos: GridPos,
     facing: Facing,
     prev_facing: Facing,
+}
+
+#[derive(Resource)]
+pub struct GameRng(Xoshiro128PlusPlus);
+
+impl GameRng {
+    pub fn new(seed: u64) -> Self {
+        return GameRng(Xoshiro128PlusPlus::seed_from_u64(seed));
+    }
+
+    pub fn choose<T: Copy>(&mut self, items: &[T]) -> Option<T> {
+        return items.choose(&mut self.0).copied();
+    }
 }

@@ -14,11 +14,15 @@ mod spritesheet;
 
 use crate::game_state::GameStatePlugin;
 use crate::level::LevelPlugin;
-use crate::player::PlayerPlugin;
+use crate::player::{GameRng, PlayerPlugin};
 use crate::spritesheet::SpriteSheetPlugin;
 
 fn main() {
+    let rng_seed: u64 = rand::random();
+    info!("rng_seed={}", rng_seed);
+
     App::new()
+        .insert_resource(GameRng::new(rng_seed))
         .add_plugins(
             DefaultPlugins
                 .set(LogPlugin {
